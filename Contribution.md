@@ -1,4 +1,3 @@
-# Contributing to SIH26034
 
 Thank you for contributing to the **SIH26034 Packaged Commodity Compliance System**.
 
