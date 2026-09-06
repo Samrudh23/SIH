@@ -1,0 +1,58 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+*.cover
+coverage.xml
+
+# Database files (runtime -- do NOT commit)
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads (runtime storage -- do NOT commit)
+backend/uploads/
+uploads/
+
+# IDE / editor
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+
+# Environment / secrets
+.env
+.env.*
+*.env
+secrets.yaml
+secrets.json
+
+# Logs
+*.log
+logs/
+
+# MyPy
+.mypy_cache/
