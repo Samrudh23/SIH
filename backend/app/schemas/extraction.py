@@ -1,5 +1,5 @@
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from app.schemas.common import BoundingBox, ImageCoverage
 
 class ExtractedField(BaseModel):
@@ -17,8 +17,20 @@ class NetQuantityExtraction(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0, description="Detection confidence")
     bounding_box: Optional[BoundingBox] = None
     image_id: Optional[str] = None
+    surface_location: Optional[str] = Field(default=None, description="Package surface e.g. front, back, side, top")
+    location: Optional[str] = Field(default=None, description="Package surface panel (alias for surface_location)")
     qualifiers: Optional[List[str]] = Field(default=None, description="Prohibited qualifiers like 'approx', 'min'")
     quiet_zone_clear: Optional[bool] = Field(default=None, description="Visual aid: is 1Hx2H quiet zone clear")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sync_location(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            loc = data.get("surface_location") or data.get("location")
+            if loc:
+                data["surface_location"] = loc
+                data["location"] = loc
+        return data
 
 class MRPExtraction(BaseModel):
     value: Optional[float] = Field(default=None, description="Parsed numeric price")
@@ -28,8 +40,20 @@ class MRPExtraction(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0, description="OCR confidence")
     bounding_box: Optional[BoundingBox] = None
     image_id: Optional[str] = None
+    surface_location: Optional[str] = Field(default=None, description="Package surface e.g. front, back, side, top")
+    location: Optional[str] = Field(default=None, description="Package surface panel (alias for surface_location)")
     is_sticker: Optional[bool] = Field(default=False, description="Whether price is printed on an individual sticker")
     original_mrp: Optional[float] = Field(default=None, description="Original printed price if covered by sticker")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sync_location(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            loc = data.get("surface_location") or data.get("location")
+            if loc:
+                data["surface_location"] = loc
+                data["location"] = loc
+        return data
 
 class DateExtraction(BaseModel):
     month: Optional[str] = Field(default=None, description="Month of manufacture/packing")
@@ -75,8 +99,10 @@ class ExtractionPayload(BaseModel):
     importer: Optional[AddressExtraction] = Field(default=None, description="Importer address details")
     country_of_origin: Optional[ExtractedField] = Field(default=None, description="Country of origin e.g. India, Germany")
     is_importer_on_pdp: Optional[bool] = Field(default=None, description="Whether Indian importer address is on Principal Display Panel")
-    net_quantity: Optional[NetQuantityExtraction] = Field(default=None, description="Declared net quantity details")
-    mrp: Optional[MRPExtraction] = Field(default=None, description="Declared retail sale price details")
+    net_quantity: Optional[NetQuantityExtraction] = Field(default=None, description="Declared net quantity details (highest confidence or primary)")
+    net_quantity_observations: List[NetQuantityExtraction] = Field(default_factory=list, description="Per-surface net quantity observations")
+    mrp: Optional[MRPExtraction] = Field(default=None, description="Declared retail sale price details (highest confidence or primary)")
+    mrp_observations: List[MRPExtraction] = Field(default_factory=list, description="Per-surface MRP observations")
     date_of_manufacture: Optional[DateExtraction] = Field(default=None, description="Month & year of packing/mfg/import")
     consumer_care: Optional[ConsumerCareExtraction] = Field(default=None, description="Customer grievance contact details")
     medical_device_markers: Optional[ExtractedField] = Field(default=None, description="Medical device marker e.g. 'Mfg. Lic. No. MD-123'")
@@ -84,5 +110,20 @@ class ExtractionPayload(BaseModel):
     stickers_detected: Optional[List[ExtractedField]] = Field(default_factory=list, description="List of sticker overlays detected")
     contrast_analysis: Optional[ExtractedField] = Field(default=None, description="Contrast/readability score & flagged regions")
     image_coverage: ImageCoverage = Field(default_factory=ImageCoverage, description="Surfaces covered in submitted images")
-    conflicting_values: Optional[Dict[str, List[Dict[str, Any]]]] = Field(default=None, description="Conflicting values detected across surfaces")
     raw_ocr_blocks: Optional[List[Dict[str, Any]]] = Field(default_factory=list, description="All raw OCR text lines and bounding boxes")
+
+    @model_validator(mode="after")
+    def sync_observations(self) -> "ExtractionPayload":
+        # MRP sync
+        if self.mrp_observations and self.mrp is None:
+            self.mrp = max(self.mrp_observations, key=lambda x: x.confidence)
+        elif self.mrp and not self.mrp_observations:
+            self.mrp_observations = [self.mrp]
+
+        # Net quantity sync
+        if self.net_quantity_observations and self.net_quantity is None:
+            self.net_quantity = max(self.net_quantity_observations, key=lambda x: x.confidence)
+        elif self.net_quantity and not self.net_quantity_observations:
+            self.net_quantity_observations = [self.net_quantity]
+
+        return self

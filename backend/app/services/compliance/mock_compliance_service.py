@@ -194,25 +194,69 @@ class MockComplianceEngine(BaseComplianceEngine):
         )
 
     def _check_conflict(self, field_name: str, extraction: ExtractionPayload) -> Optional[ConflictObject]:
-        if not extraction.conflicting_values or field_name not in extraction.conflicting_values:
-            return None
-        items_raw = extraction.conflicting_values[field_name]
-        if len(items_raw) < 2:
-            return None
-        items = [
-            ConflictItem(
-                value=item.get("value"),
-                image_id=item.get("image_id"),
-                location=item.get("location"),
+        if field_name == "mrp":
+            observations = extraction.mrp_observations or []
+            if len(observations) < 2:
+                return None
+
+            distinct_values = set()
+            for obs in observations:
+                if obs.value is not None:
+                    distinct_values.add(round(obs.value, 2))
+                elif obs.raw_text:
+                    distinct_values.add(obs.raw_text.strip().lower())
+
+            if len(distinct_values) < 2:
+                return None
+
+            items = [
+                ConflictItem(
+                    value=f"{obs.currency or '₹'}{obs.value:g}" if obs.value is not None else obs.raw_text,
+                    image_id=obs.image_id,
+                    location=obs.surface_location or obs.location,
+                )
+                for obs in observations
+            ]
+            return ConflictObject(
+                field="mrp",
+                values_found=items,
+                resolution="NEEDS_MANUAL_REVIEW",
+                reason="Conflicting MRP values detected across submitted package surfaces.",
             )
-            for item in items_raw
-        ]
-        return ConflictObject(
-            field=field_name,
-            values_found=items,
-            resolution="NEEDS_MANUAL_REVIEW",
-            reason=f"Conflicting {field_name.upper()} values detected across submitted package surfaces.",
-        )
+
+        elif field_name == "net_quantity":
+            observations = extraction.net_quantity_observations or []
+            if len(observations) < 2:
+                return None
+
+            distinct_values = set()
+            for obs in observations:
+                v = round(obs.value, 4) if obs.value is not None else None
+                u = obs.unit.strip().lower() if obs.unit else ""
+                if v is None and not u:
+                    distinct_values.add(obs.raw_text.strip().lower())
+                else:
+                    distinct_values.add((v, u))
+
+            if len(distinct_values) < 2:
+                return None
+
+            items = [
+                ConflictItem(
+                    value=f"{obs.value:g}{obs.unit}" if (obs.value is not None and obs.unit) else (f"{obs.value:g}" if obs.value is not None else obs.raw_text),
+                    image_id=obs.image_id,
+                    location=obs.surface_location or obs.location,
+                )
+                for obs in observations
+            ]
+            return ConflictObject(
+                field="net_quantity",
+                values_found=items,
+                resolution="NEEDS_MANUAL_REVIEW",
+                reason="Conflicting NET_QUANTITY values detected across submitted package surfaces.",
+            )
+
+        return None
 
     def _eval_req_01(self, ext: ExtractionPayload, cov: ImageCoverage, is_pan_masala: bool) -> RuleResult:
         meta = RULE_VERSION_METADATA_TABLE["REQ-MVP-01"]

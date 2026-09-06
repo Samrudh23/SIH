@@ -136,3 +136,155 @@ def test_visual_aid_constraint_req_14_and_15(client):
     assert rules_map["REQ-MVP-15"]["status"] in ("NEEDS_MANUAL_REVIEW", "NOT_DETECTED")
     assert rules_map["REQ-MVP-14"]["status"] != "COMPLIANT"
     assert rules_map["REQ-MVP-15"]["status"] != "COMPLIANT"
+
+
+def test_mrp_conflict_detection_across_surfaces(client):
+    create_res = client.post("/api/inspections", json={"product_name": "Conflict MRP Biscuit"})
+    insp_id = create_res.json()["id"]
+
+    extraction = {
+        "mrp_observations": [
+            {
+                "value": 100.0,
+                "currency": "₹",
+                "raw_text": "MRP ₹100 incl. of all taxes",
+                "confidence": 0.90,
+                "surface_location": "front",
+                "image_id": "img_001",
+            },
+            {
+                "value": 120.0,
+                "currency": "₹",
+                "raw_text": "MRP ₹120 incl. of all taxes",
+                "confidence": 0.92,
+                "surface_location": "back",
+                "image_id": "img_002",
+            },
+        ],
+        "net_quantity": {
+            "value": 100.0,
+            "unit": "g",
+            "raw_text": "Net Qty: 100g",
+            "confidence": 0.95,
+        },
+        "product_name": {"value": "Biscuits", "raw_text": "Biscuits", "confidence": 0.9},
+        "manufacturer": {"premises": "Factory A", "raw_text": "Mfg by Factory A", "confidence": 0.9},
+        "date_of_manufacture": {"month": "01", "year": "2026", "raw_text": "01/2026", "confidence": 0.9},
+    }
+    client.post(f"/api/inspections/{insp_id}/extraction", json=extraction)
+
+    analyze_res = client.post(f"/api/inspections/{insp_id}/analyze")
+    assert analyze_res.status_code == 200
+    data = analyze_res.json()
+
+    rules_map = {r["rule_id"]: r for r in data["rule_results"]}
+    req_02 = rules_map["REQ-MVP-02"]
+
+    # REQ-MVP-02 must be routed to NEEDS_MANUAL_REVIEW with conflict details
+    assert req_02["status"] == "NEEDS_MANUAL_REVIEW"
+    assert req_02["conflicts"] is not None
+    conflict = req_02["conflicts"]
+    assert conflict["field"] == "mrp"
+    assert conflict["resolution"] == "NEEDS_MANUAL_REVIEW"
+    assert len(conflict["values_found"]) == 2
+    assert conflict["values_found"][0]["location"] == "front"
+    assert conflict["values_found"][0]["image_id"] == "img_001"
+    assert conflict["values_found"][1]["location"] == "back"
+    assert conflict["values_found"][1]["image_id"] == "img_002"
+
+
+def test_net_quantity_conflict_detection_across_surfaces(client):
+    create_res = client.post("/api/inspections", json={"product_name": "Conflict Quantity Chips"})
+    insp_id = create_res.json()["id"]
+
+    extraction = {
+        "net_quantity_observations": [
+            {
+                "value": 500.0,
+                "unit": "g",
+                "raw_text": "Net Qty: 500g",
+                "confidence": 0.90,
+                "surface_location": "front",
+                "image_id": "img_001",
+            },
+            {
+                "value": 400.0,
+                "unit": "g",
+                "raw_text": "Net Qty: 400g",
+                "confidence": 0.88,
+                "surface_location": "back",
+                "image_id": "img_002",
+            },
+        ],
+        "mrp": {
+            "value": 50.0,
+            "raw_text": "MRP ₹50 incl. of all taxes",
+            "confidence": 0.95,
+        },
+        "product_name": {"value": "Chips", "raw_text": "Chips", "confidence": 0.9},
+        "manufacturer": {"premises": "Factory B", "raw_text": "Mfg by Factory B", "confidence": 0.9},
+        "date_of_manufacture": {"month": "01", "year": "2026", "raw_text": "01/2026", "confidence": 0.9},
+    }
+    client.post(f"/api/inspections/{insp_id}/extraction", json=extraction)
+
+    analyze_res = client.post(f"/api/inspections/{insp_id}/analyze")
+    assert analyze_res.status_code == 200
+    data = analyze_res.json()
+
+    rules_map = {r["rule_id"]: r for r in data["rule_results"]}
+    req_03 = rules_map["REQ-MVP-03"]
+
+    assert req_03["status"] == "NEEDS_MANUAL_REVIEW"
+    assert req_03["conflicts"] is not None
+    conflict = req_03["conflicts"]
+    assert conflict["field"] == "net_quantity"
+    assert conflict["resolution"] == "NEEDS_MANUAL_REVIEW"
+    assert len(conflict["values_found"]) == 2
+
+
+def test_multi_observation_agreement_no_conflict(client):
+    create_res = client.post("/api/inspections", json={"product_name": "Agreed MRP Biscuit"})
+    insp_id = create_res.json()["id"]
+
+    extraction = {
+        "mrp_observations": [
+            {
+                "value": 100.0,
+                "currency": "₹",
+                "raw_text": "MRP ₹100 incl. of all taxes",
+                "confidence": 0.90,
+                "surface_location": "front",
+                "image_id": "img_001",
+            },
+            {
+                "value": 100.0,
+                "currency": "₹",
+                "raw_text": "MRP ₹100 incl. of all taxes",
+                "confidence": 0.95,
+                "surface_location": "back",
+                "image_id": "img_002",
+            },
+        ],
+        "net_quantity": {
+            "value": 100.0,
+            "unit": "g",
+            "raw_text": "Net Qty: 100g",
+            "confidence": 0.95,
+        },
+        "product_name": {"value": "Biscuits", "raw_text": "Biscuits", "confidence": 0.9},
+        "manufacturer": {"premises": "Factory A", "raw_text": "Mfg by Factory A", "confidence": 0.9},
+        "date_of_manufacture": {"month": "01", "year": "2026", "raw_text": "01/2026", "confidence": 0.9},
+    }
+    client.post(f"/api/inspections/{insp_id}/extraction", json=extraction)
+
+    analyze_res = client.post(f"/api/inspections/{insp_id}/analyze")
+    assert analyze_res.status_code == 200
+    data = analyze_res.json()
+
+    rules_map = {r["rule_id"]: r for r in data["rule_results"]}
+    req_02 = rules_map["REQ-MVP-02"]
+
+    # When both observations agree, no conflict is raised; REQ-MVP-02 is COMPLIANT
+    assert req_02["status"] == "COMPLIANT"
+    assert req_02.get("conflicts") is None
+

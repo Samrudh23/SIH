@@ -66,3 +66,52 @@ def test_reject_missing_required_raw_text(client):
     }
     response = client.post(f"/api/inspections/{insp_id}/extraction", json=bad_payload)
     assert response.status_code == 422
+
+
+def test_submit_multi_observation_extraction(client):
+    create_res = client.post("/api/inspections", json={"product_name": "Multi Observation Biscuit"})
+    insp_id = create_res.json()["id"]
+
+    payload = {
+        "mrp_observations": [
+            {
+                "value": 100.0,
+                "raw_text": "MRP ₹ 100.00 incl. of all taxes",
+                "confidence": 0.85,
+                "surface_location": "front",
+                "image_id": "img_001",
+            },
+            {
+                "value": 120.0,
+                "raw_text": "MRP ₹ 120.00 incl. of all taxes",
+                "confidence": 0.95,
+                "surface_location": "back",
+                "image_id": "img_002",
+            },
+        ],
+        "net_quantity_observations": [
+            {
+                "value": 500.0,
+                "unit": "g",
+                "raw_text": "Net Qty: 500g",
+                "confidence": 0.92,
+                "surface_location": "front",
+                "image_id": "img_001",
+            }
+        ],
+    }
+    res = client.post(f"/api/inspections/{insp_id}/extraction", json=payload)
+    assert res.status_code == 200
+
+    stored = client.get(f"/api/inspections/{insp_id}/extraction").json()
+    assert len(stored["mrp_observations"]) == 2
+    assert stored["mrp_observations"][0]["value"] == 100.0
+    assert stored["mrp_observations"][0]["surface_location"] == "front"
+    assert stored["mrp_observations"][1]["value"] == 120.0
+    assert stored["mrp_observations"][1]["surface_location"] == "back"
+    # Backwards-compatible convenience accessor selects highest confidence (0.95 -> 120.0)
+    assert stored["mrp"]["value"] == 120.0
+    assert stored["mrp"]["confidence"] == 0.95
+
+    assert len(stored["net_quantity_observations"]) == 1
+    assert stored["net_quantity"]["value"] == 500.0
