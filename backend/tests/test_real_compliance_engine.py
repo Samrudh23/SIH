@@ -635,3 +635,80 @@ def test_reconciliation_against_mock_engine(real_engine, mock_engine):
         # For non-medical confirmed products, core rules should agree on standard demo products
         for rid in ["REQ-MVP-01", "REQ-MVP-02", "REQ-MVP-03", "REQ-MVP-04", "REQ-MVP-05", "REQ-MVP-06", "REQ-MVP-07", "REQ-MVP-08"]:
             assert real_map[rid] == mock_map[rid], f"Discrepancy on Product {i} for {rid}: Real={real_map[rid]}, Mock={mock_map[rid]}"
+
+
+# -----------------------------------------------------------------------------
+# 32. Additional Edge Cases for 100% Rule Path Verification
+# -----------------------------------------------------------------------------
+def test_req_01_small_package_normal_commodity_exemption(real_engine):
+    # Non-Pan Masala commodity under 10g is exempt from Chapter II declarations under Rule 26(a)
+    extraction = ExtractionPayload(
+        product_name=ExtractedField(value="Button Battery", raw_text="Button Battery", confidence=0.95),
+        commodity_category=ExtractedField(value="Electronics", raw_text="Electronics", confidence=0.95),
+        net_quantity=NetQuantityExtraction(value=5.0, unit="g", raw_text="5g", confidence=0.95),
+    )
+    res = real_engine.evaluate(extraction)
+    rules_map = {r.rule_id: r for r in res.rule_results}
+    assert rules_map["REQ-MVP-01"].status == ResultState.NOT_APPLICABLE
+    assert "exempt_under_rule_26_a=true" in rules_map["REQ-MVP-01"].normalized_value
+
+
+def test_req_02_bidi_lpg_mrp_exemption(real_engine):
+    # Bidies and domestic LPG are exempt from declaring retail sale price
+    extraction = ExtractionPayload(
+        commodity_category=ExtractedField(value="Domestic LPG Cylinder", raw_text="Domestic LPG Cylinder", confidence=0.95),
+    )
+    res = real_engine.evaluate(extraction)
+    rules_map = {r.rule_id: r for r in res.rule_results}
+    assert rules_map["REQ-MVP-02"].status == ResultState.NOT_APPLICABLE
+    assert "exempt_category=true" in rules_map["REQ-MVP-02"].normalized_value
+
+
+def test_req_04_quantity_above_1000g_in_grams(real_engine):
+    # 1500 g should transition to kg
+    extraction = ExtractionPayload(
+        net_quantity=NetQuantityExtraction(value=1500.0, unit="g", raw_text="1500 g", confidence=0.95)
+    )
+    res = real_engine.evaluate(extraction)
+    rules_map = {r.rule_id: r for r in res.rule_results}
+    assert rules_map["REQ-MVP-04"].status == ResultState.POTENTIAL_VIOLATION
+    assert "must transition to kg" in rules_map["REQ-MVP-04"].reason
+
+
+def test_req_06_date_overwriting_violation(real_engine):
+    # Date with overwriting/double-stamping violates Rule 6(1)(d) proviso
+    extraction = ExtractionPayload(
+        date_of_manufacture=DateExtraction(
+            month="05",
+            year="2026",
+            has_overwriting=True,
+            raw_text="05/2026",
+            confidence=0.88,
+        )
+    )
+    res = real_engine.evaluate(extraction)
+    rules_map = {r.rule_id: r for r in res.rule_results}
+    assert rules_map["REQ-MVP-06"].status == ResultState.POTENTIAL_VIOLATION
+    assert "violating Rule 6(1)(d) proviso" in rules_map["REQ-MVP-06"].reason
+
+
+def test_req_06_bidi_lpg_date_exemption(real_engine):
+    # Bidies and LPG are exempt from date declaration under Rule 6(1) Proviso (A)
+    extraction = ExtractionPayload(
+        commodity_category=ExtractedField(value="Agarbatti", raw_text="Agarbatti", confidence=0.95),
+    )
+    res = real_engine.evaluate(extraction)
+    rules_map = {r.rule_id: r for r in res.rule_results}
+    assert rules_map["REQ-MVP-06"].status == ResultState.NOT_APPLICABLE
+
+
+def test_req_13_non_mrp_sticker_violation(real_engine):
+    # Sticker on other mandatory declarations violates Rule 6(3)
+    extraction = ExtractionPayload(
+        stickers_detected=[ExtractedField(raw_text="overlay_on_date_block", confidence=0.9)],
+    )
+    res = real_engine.evaluate(extraction)
+    rules_map = {r.rule_id: r for r in res.rule_results}
+    assert rules_map["REQ-MVP-13"].status == ResultState.POTENTIAL_VIOLATION
+    assert "Physical sticker detected" in rules_map["REQ-MVP-13"].reason
+
