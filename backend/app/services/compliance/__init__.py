@@ -1,19 +1,24 @@
 from app.config import settings
 from app.services.compliance.base import BaseComplianceEngine
 from app.services.compliance.mock_compliance_service import MockComplianceEngine
+from app.services.compliance.real_compliance_engine import RealComplianceEngine
 
 def get_compliance_engine() -> BaseComplianceEngine:
     """
     SWAPPABLE COMPLIANCE ENGINE FACTORY
     -----------------------------------
-    When P2 provides the real compliance engine:
-    1. Import the real compliance engine class here.
-    2. Ensure it implements BaseComplianceEngine (or adapt its evaluate method).
-    3. Return an instance of it when settings.COMPLIANCE_ENGINE_TYPE == "real" or by default.
+    Switches between MockComplianceEngine and RealComplianceEngine (P2)
+    based on settings.COMPLIANCE_ENGINE_TYPE.
+    Defaults to RealComplianceEngine when COMPLIANCE_ENGINE_TYPE != "mock".
     """
     if settings.COMPLIANCE_ENGINE_TYPE == "mock":
         return MockComplianceEngine()
-    # Fallback to mock for Phase 1
-    return MockComplianceEngine()
+    return RealComplianceEngine()
 
-__all__ = ["BaseComplianceEngine", "MockComplianceEngine", "get_compliance_engine"]
+__all__ = [
+    "BaseComplianceEngine",
+    "MockComplianceEngine",
+    "RealComplianceEngine",
+    "get_compliance_engine",
+]
+
