@@ -46,6 +46,15 @@ export const RESULT_STATE_CONFIG = {
     description: "Technical vision pipeline failed. No legal determination made.",
     ariaLabel: "Status: Analysis Failed",
   },
+  // PENDING is a backend workflow state (not a ResultState enum), used for newly created
+  // inspections that have not yet been analyzed. Displayed in dashboard/history lists.
+  PENDING: {
+    label: "PENDING ANALYSIS",
+    bgClass: "badge-na",
+    icon: `<svg class="w-3.5 h-3.5 mr-1 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+    description: "Inspection created. Compliance analysis not yet triggered.",
+    ariaLabel: "Status: Pending Analysis",
+  },
 };
 
 export function renderResultBadge(state, size = "md") {

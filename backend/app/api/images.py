@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
-from app.schemas.inspection import ImageUploadResponse
+from app.schemas.inspection import ImageUploadResponse, ImageSurfaceUpdate, CoverageUpdate, InspectionResponse
 from app.services.storage_service import storage_service
 from app.services.inspection_service import inspection_service
 from app.models.inspection import ImageEvidenceModel
@@ -16,6 +16,12 @@ router = APIRouter(tags=["Evidence & Images"])
     response_model=ImageUploadResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Upload Package Image / Evidence",
+)
+@router.post(
+    "/inspections/{inspection_id}/images",
+    response_model=ImageUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload Package Image / Evidence (Plural Alias)",
 )
 async def upload_inspection_image(
     inspection_id: str,
@@ -56,6 +62,7 @@ async def upload_inspection_image(
     )
 
 @router.get("/inspections/{inspection_id}/evidence", summary="Retrieve Inspection Evidence")
+@router.get("/inspections/{inspection_id}/images", summary="Retrieve Inspection Evidence (Plural Alias)")
 def get_inspection_evidence(
     inspection_id: str,
     request: Request,
@@ -96,6 +103,46 @@ def get_inspection_evidence(
         "images": evidence_items,
         "rule_evidence": rule_evidence,
     }
+
+@router.patch(
+    "/inspections/{inspection_id}/images/{evidence_id}/surface",
+    summary="Assign or Update Package Surface on Uploaded Image",
+)
+@router.post(
+    "/inspections/{inspection_id}/images/{evidence_id}/surface",
+    summary="Assign or Update Package Surface on Uploaded Image (POST Alias)",
+)
+def update_image_surface(
+    inspection_id: str,
+    evidence_id: str,
+    payload: ImageSurfaceUpdate,
+    db: Session = Depends(get_db),
+):
+    evidence = inspection_service.update_image_surface(
+        db=db,
+        inspection_id=inspection_id,
+        evidence_id=evidence_id,
+        surface=payload.surface,
+    )
+    return {
+        "status": "success",
+        "evidence_id": evidence.id,
+        "inspection_id": evidence.inspection_id,
+        "image_type": evidence.image_type,
+    }
+
+@router.put(
+    "/inspections/{inspection_id}/coverage",
+    response_model=InspectionResponse,
+    summary="Update Package Surface Coverage Checklist",
+)
+def update_inspection_coverage(
+    inspection_id: str,
+    payload: CoverageUpdate,
+    db: Session = Depends(get_db),
+):
+    record = inspection_service.update_image_coverage(db, inspection_id, payload.coverage)
+    return inspection_service.to_response(record)
 
 @router.get("/images/{file_name}", summary="Serve Stored Image File")
 def get_image_file(file_name: str):

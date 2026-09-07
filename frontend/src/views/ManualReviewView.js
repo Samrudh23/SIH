@@ -16,8 +16,14 @@ import { renderConflictViewer } from "../components/ConflictViewer.js";
 import { renderEvidenceCard } from "../components/EvidenceViewer.js";
 
 export async function renderManualReviewView(inspectionId) {
-  let compliance, inspection;
+  let compliance, inspection, manualReviewData = null;
   try {
+    // Attempt dedicated manual review endpoint first
+    try {
+      manualReviewData = await apiService.getManualReview(inspectionId);
+    } catch (mrErr) {
+      console.warn("Could not retrieve pre-computed manual review payload, falling back to full compliance:", mrErr);
+    }
     compliance = await apiService.getComplianceResult(inspectionId);
     inspection = await apiService.getInspection(inspectionId);
   } catch (err) {
@@ -30,8 +36,8 @@ export async function renderManualReviewView(inspectionId) {
     `;
   }
 
-  // Filter items needing human review or manual confirmation
-  const reviewItems = (compliance.rule_results || []).filter(
+  // Use review items from dedicated endpoint if available, otherwise filter from rule results
+  const reviewItems = manualReviewData?.unresolved_rules || (compliance.rule_results || []).filter(
     (r) => r.status === "NEEDS_MANUAL_REVIEW" || r.status === "NOT_DETECTED" || r.conflicts || r.rule_id === "REQ-MVP-11"
   );
 

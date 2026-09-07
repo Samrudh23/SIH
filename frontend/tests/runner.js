@@ -4,6 +4,7 @@
  */
 
 import { runTests } from "./compliance.test.js";
+import { runBackendIntegrationTests } from "./backend_integration.test.js";
 
 class TestRunner {
   constructor() {
@@ -62,8 +63,9 @@ class TestRunner {
 
 export async function executeTestSuite() {
   const runner = new TestRunner();
-  console.log("Starting SIH26034 P4 Frontend Compliance Test Suite...\n");
+  console.log("Starting SIH26034 P4 Frontend Compliance & Real Backend Integration Test Suite...\n");
   await runTests(runner);
+  await runBackendIntegrationTests(runner);
   return runner.summary();
 }
 

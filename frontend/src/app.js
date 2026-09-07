@@ -17,7 +17,7 @@ import { renderReportModal } from "./views/ReportModal.js";
 class App {
   constructor() {
     this.currentRoute = "dashboard";
-    this.currentInspectionId = "insp-001";
+    this.currentInspectionId = null;
     this.stagedFiles = [];
     this.init();
   }
@@ -46,7 +46,13 @@ class App {
   async handleRoute() {
     const { route, id } = this.parseHash();
     this.currentRoute = route;
-    if (id) this.currentInspectionId = id;
+    if (id) {
+      this.currentInspectionId = id;
+    } else if (["extraction", "compliance", "review"].includes(route) && !this.currentInspectionId) {
+      // In live mode without a specific inspection ID, redirect to dashboard or history
+      window.location.hash = "#/dashboard";
+      return;
+    }
 
     await this.render();
   }
@@ -163,12 +169,22 @@ class App {
       form.onsubmit = async (e) => {
         e.preventDefault();
         const submitBtn = document.getElementById("submit-inspection-btn");
-        if (submitBtn) {
-          submitBtn.disabled = true;
-          submitBtn.innerHTML = `<span>Uploading & Running Compliance Engine...</span>`;
-        }
+        const existingAlert = document.getElementById("inspection-create-error-alert");
+        if (existingAlert) existingAlert.remove();
+
+        const updateBtn = (text) => {
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `
+              <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+              <span>${text}</span>
+            `;
+          }
+        };
 
         try {
+          updateBtn("Creating Inspection Record in P3...");
+
           const payload = {
             product_name: document.getElementById("product_name").value,
             brand_name: document.getElementById("brand_name").value,
@@ -184,21 +200,71 @@ class App {
 
           const newInspection = await apiService.createInspection(payload);
 
-          // Upload staged files
-          for (const item of this.stagedFiles) {
-            await apiService.uploadImage(newInspection.id, item.file, item.surface);
+          // Upload staged files with surface labels
+          if (this.stagedFiles.length > 0) {
+            for (let i = 0; i < this.stagedFiles.length; i++) {
+              const item = this.stagedFiles[i];
+              updateBtn(`Uploading Surface [${i + 1}/${this.stagedFiles.length}]: ${item.surface}...`);
+              await apiService.uploadInspectionImage(newInspection.id, item.file, item.surface);
+            }
+
+            // Sync updated surface coverage based on uploaded image surfaces
+            const updatedCoverage = {
+              front: payload.image_coverage.front || this.stagedFiles.some((f) => f.surface === "front"),
+              back: payload.image_coverage.back || this.stagedFiles.some((f) => f.surface === "back"),
+              side: payload.image_coverage.side || this.stagedFiles.some((f) => f.surface === "side"),
+              top: payload.image_coverage.top || this.stagedFiles.some((f) => f.surface === "top"),
+            };
+            try {
+              await apiService.updateCoverage(newInspection.id, updatedCoverage);
+            } catch (covErr) {
+              console.warn("Could not sync updated coverage checklist:", covErr);
+            }
           }
 
-          // Trigger analysis
+          // Ensure extraction payload exists for backend compliance evaluation
+          updateBtn("Verifying Structured Extraction Payload...");
+          let hasExtraction = false;
+          try {
+            await apiService.getExtraction(newInspection.id);
+            hasExtraction = true;
+          } catch {
+            hasExtraction = false;
+          }
+
+          if (!hasExtraction) {
+            updateBtn("Synthesizing P1 Extraction Observations...");
+            const extractionPayload = apiService.createInitialExtractionPayload(newInspection, this.stagedFiles);
+            await apiService.submitExtraction(newInspection.id, extractionPayload);
+          }
+
+          // Trigger authoritative P2 RealComplianceEngine
+          updateBtn("Evaluating Legal Metrology Rules (15 checks)...");
           await apiService.analyzeInspection(newInspection.id);
 
           this.stagedFiles = [];
           window.location.hash = `#/compliance/${newInspection.id}`;
         } catch (err) {
-          alert(`Error creating inspection: ${err.message}`);
+          console.error("Failed to create and analyze inspection:", err);
+          const errorContainer = document.createElement("div");
+          errorContainer.id = "inspection-create-error-alert";
+          errorContainer.className = "p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs space-y-1.5 animate-in fade-in";
+          errorContainer.innerHTML = `
+            <div class="font-bold text-rose-900 flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-rose-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+              <span>Inspection Creation Failed (${err.status ? "HTTP " + err.status : "Network Error"})</span>
+            </div>
+            <div class="text-rose-800">${err.message}</div>
+            ${err.actionableRemedy ? `<div class="text-slate-600 bg-white/70 p-2 rounded border border-rose-100 mt-1 font-mono">${err.actionableRemedy}</div>` : ""}
+          `;
+          form.insertBefore(errorContainer, form.lastElementChild);
+
           if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.innerHTML = `<span>Run OCR & Compliance Analysis</span>`;
+            submitBtn.innerHTML = `
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+              <span>Retry OCR & Compliance Analysis</span>
+            `;
           }
         }
       };

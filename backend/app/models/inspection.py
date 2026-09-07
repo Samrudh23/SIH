@@ -8,6 +8,7 @@ from sqlalchemy import (
     Text,
     ForeignKey,
     JSON,
+    Boolean,
 )
 from sqlalchemy.orm import relationship
 
@@ -37,6 +38,7 @@ class InspectionModel(Base):
         nullable=False,
     )
     notes = Column(Text, nullable=True)
+    is_medical_device_confirmed = Column(Boolean, nullable=True, default=None)
     metadata_json = Column(JSON, default=dict, nullable=False)
 
     # Relationships

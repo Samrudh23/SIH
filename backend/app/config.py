@@ -34,7 +34,7 @@ class Settings:
     ]
 
     # Compliance Engine: "mock" or "real"
-    COMPLIANCE_ENGINE_TYPE: str = os.getenv("COMPLIANCE_ENGINE_TYPE", "mock")
+    COMPLIANCE_ENGINE_TYPE: str = os.getenv("COMPLIANCE_ENGINE_TYPE", "real")
 
 settings = Settings()
 settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

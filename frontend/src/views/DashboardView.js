@@ -8,8 +8,47 @@ import { renderResultBadge, renderWorkflowBadge } from "../components/StatusBadg
 import { MOCK_FIXTURES } from "../services/mockFixtures.js";
 
 export async function renderDashboardView() {
-  const summary = await apiService.getDashboardSummary();
+  let summary;
   const currentMode = apiService.getMode();
+
+  try {
+    summary = await apiService.getDashboardSummary();
+  } catch (err) {
+    return `
+      <div class="space-y-6 animate-in fade-in duration-150">
+        <div class="p-6 bg-rose-50 border border-rose-200 rounded-2xl max-w-2xl mx-auto space-y-4 shadow-sm text-center">
+          <div class="w-12 h-12 mx-auto rounded-full bg-rose-100 text-rose-700 flex items-center justify-center font-bold">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-rose-900">Backend API Offline or Unreachable</h2>
+            <p class="text-xs text-rose-700 mt-1">${err.message}</p>
+          </div>
+          ${
+            err.actionableRemedy
+              ? `<div class="text-xs text-slate-700 bg-white p-3 rounded-lg border border-rose-200 font-mono text-left space-y-1">
+                  <div class="font-bold text-slate-800">Actionable Remedy:</div>
+                  <div>${err.actionableRemedy}</div>
+                  <div class="text-[11px] text-slate-500 mt-1">Command to start backend: <code>python -m uvicorn app.main:app --port 8000</code></div>
+                </div>`
+              : ""
+          }
+          <div class="flex items-center justify-center gap-3 pt-2">
+            <button onclick="window.location.reload()" class="px-4 py-2 bg-blue-700 text-white rounded-lg text-xs font-bold hover:bg-blue-800 shadow-sm transition-colors">
+              Retry Connection
+            </button>
+            ${
+              apiService.allowMock
+                ? `<button onclick="window.sihApp ? window.sihApp.setApiMode('mock') : apiService.setMode('mock'); window.location.reload();" class="px-4 py-2 border border-slate-300 bg-white text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-50 shadow-sm transition-colors">
+                    Switch to Mock Mode (Dev Only)
+                  </button>`
+                : ""
+            }
+          </div>
+        </div>
+      </div>
+    `;
+  }
 
   return `
     <div class="space-y-6 animate-in fade-in duration-150">
@@ -31,7 +70,9 @@ export async function renderDashboardView() {
         <!-- Action Buttons -->
         <div class="flex flex-wrap items-center gap-2.5">
           
-          <!-- Quick Fixture Selector -->
+          ${
+            currentMode === "mock"
+              ? `<!-- Quick Fixture Selector (Dev/Mock Mode Only) -->
           <div class="relative">
             <select id="quick-fixture-select" 
                     class="bg-white border border-slate-300 text-slate-700 text-xs rounded-lg px-3 py-2 font-mono hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
@@ -48,7 +89,13 @@ export async function renderDashboardView() {
               <option value="insp-010">10. Small Pack Exemption (0.5g)</option>
               <option value="insp-011">11. Pan Masala Special Router</option>
             </select>
-          </div>
+          </div>`
+              : `<a href="#/history" 
+                    class="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg shadow-sm transition-colors">
+                  <svg class="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <span>Inspection History Archive</span>
+                </a>`
+          }
 
           <a href="#/new" 
              class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold rounded-lg shadow transition-colors">

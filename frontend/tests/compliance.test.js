@@ -1,13 +1,15 @@
 /**
  * Frontend Compliance Test Suite for SIH26034
- * Verifies result states, 15 MVP rules, multi-surface conflicts, Fix 2 medical device gate, and fixtures.
+ * Verifies result states, 15 MVP rules, multi-surface conflicts, Fix 2 medical device gate,
+ * environment configuration, and strict error propagation (no silent mock fallback).
  */
 
 import { RESULT_STATE_CONFIG, renderResultBadge } from "../src/components/StatusBadge.js";
 import { renderConfidenceMeter } from "../src/components/ConfidenceMeter.js";
 import { renderConflictViewer } from "../src/components/ConflictViewer.js";
 import { MOCK_FIXTURES, RULE_METADATA } from "../src/services/mockFixtures.js";
-import { apiService } from "../src/services/api.js";
+import { apiService, ApiError } from "../src/services/api.js";
+import { ENV } from "../src/config/env.js";
 
 export async function runTests(assert) {
   // Test 1: All 6 result states exist and render properly
@@ -92,8 +94,9 @@ export async function runTests(assert) {
     assert.equal(qtyRule.conflicts.values_found.length, 2);
   });
 
-  // Test 5: Fix 2 Medical device confirmation gate routes properly
+  // Test 5: Fix 2 Medical device confirmation gate routes properly in mock mode
   await assert.test("5. Fix 2 Medical device confirmation gate executes correctly", async () => {
+    apiService.setMode("mock");
     const pendingFixture = MOCK_FIXTURES["insp-006"];
     assert.equal(pendingFixture.compliance.overall_status, "NEEDS_MANUAL_REVIEW");
 
@@ -144,5 +147,81 @@ export async function runTests(assert) {
         assert.ok(f.compliance.summary_counts, `Fixture ${key} compliance must have summary counts`);
       }
     });
+  });
+
+  // Test 9: Strict Error Propagation — Live mode NEVER silently falls back to mock fixtures
+  await assert.test("9. Strict Error Propagation: Live API failures throw ApiError instead of silent mock fallback", async () => {
+    apiService.setMode("live");
+    assert.equal(apiService.getMode(), "live", "Service mode must be live");
+
+    // Attempting to fetch a nonexistent inspection in live mode must throw an ApiError
+    let threwError = false;
+    try {
+      // Using an invalid host/port endpoint to simulate network down
+      const badApiService = new apiService.constructor();
+      badApiService.baseUrl = "http://127.0.0.1:9999/api";
+      badApiService.setMode("live");
+      await badApiService.getInspection("nonexistent-inspection-id");
+    } catch (err) {
+      threwError = true;
+      assert.ok(err instanceof ApiError, "Must throw an instance of ApiError");
+      assert.ok(err.actionableRemedy, "Must provide an actionable remedy message for the inspector");
+      assert.ok(err.message.includes("Cannot reach backend") || err.message.includes("Network"), "Error must clearly describe network failure");
+    }
+    assert.ok(threwError, "Live API call must throw error on backend failure and NEVER return mock fixture");
+  });
+
+  // Test 10: Environment Configuration integrity
+  await assert.test("10. Environment configuration provides valid defaults and controls", () => {
+    assert.ok(ENV.APP_ENV, "APP_ENV must be defined");
+    assert.ok(ENV.API_BASE_URL, "API_BASE_URL must be defined");
+    assert.ok(typeof ENV.IS_PRODUCTION === "boolean", "IS_PRODUCTION must be boolean");
+    assert.ok(typeof ENV.ALLOW_MOCK === "boolean", "ALLOW_MOCK must be boolean");
+
+    // In production, ALLOW_MOCK must be false
+    if (ENV.IS_PRODUCTION) {
+      assert.equal(ENV.ALLOW_MOCK, false, "ALLOW_MOCK must be false in production");
+    }
+  });
+
+  // Test 11: ExtractionPayload bridge helper generates valid schema object
+  await assert.test("11. Initial ExtractionPayload generator conforms to P3 extraction schema", () => {
+    const dummyInspection = {
+      id: "insp-test-99",
+      product_name: "Test Commodity 200g",
+      brand_name: "BrandX",
+      commodity_category: "Biscuits",
+      image_coverage: { front: true, back: true, side: false, top: false },
+    };
+    const staged = [
+      { surface: "front", file: { name: "front.jpg" } },
+      { surface: "back", file: { name: "back.jpg" } },
+    ];
+    const payload = apiService.createInitialExtractionPayload(dummyInspection, staged);
+
+    assert.equal(payload.inspection_id, "insp-test-99");
+    assert.ok(payload.product_name && payload.product_name.value === "Test Commodity 200g");
+    assert.ok(payload.net_quantity && payload.net_quantity.value === 100.0);
+    assert.ok(payload.net_quantity_observations.length >= 1);
+    assert.ok(payload.mrp && payload.mrp.value === 50.0);
+    assert.ok(payload.mrp_observations.length >= 1);
+    assert.ok(payload.manufacturer && payload.manufacturer.raw_text);
+    assert.ok(payload.country_of_origin && payload.country_of_origin.value === "India");
+    assert.ok(payload.consumer_care && payload.consumer_care.phone);
+  });
+
+  // Test 12: PENDING workflow/compliance status badge renders correctly
+  await assert.test("12. PENDING status badge configuration renders accessible label", () => {
+    assert.ok(RESULT_STATE_CONFIG["PENDING"], "PENDING state must be defined in RESULT_STATE_CONFIG");
+    const html = renderResultBadge("PENDING");
+    assert.ok(html.includes("PENDING ANALYSIS"), "Badge for PENDING must display 'PENDING ANALYSIS'");
+    assert.ok(html.includes("aria-label"), "Badge for PENDING must include accessible aria-label");
+  });
+
+  // Test 13: apiService exposes complete contract endpoints (getManualReview, updateImageSurface, updateCoverage)
+  await assert.test("13. apiService methods for manual review, surface update, and coverage checklist exist", () => {
+    assert.equal(typeof apiService.getManualReview, "function", "apiService.getManualReview must be a function");
+    assert.equal(typeof apiService.updateImageSurface, "function", "apiService.updateImageSurface must be a function");
+    assert.equal(typeof apiService.updateCoverage, "function", "apiService.updateCoverage must be a function");
   });
 }

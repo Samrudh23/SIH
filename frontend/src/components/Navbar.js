@@ -60,23 +60,38 @@ export function renderNavbar(activeRoute = "dashboard") {
           <!-- System Status & Mode Toggle -->
           <div class="flex items-center gap-3">
             
-            <!-- Live vs Mock Mode Switcher -->
-            <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5 text-[11px] font-mono">
-              <button id="toggle-mock-btn" 
-                      class="px-2.5 py-1 rounded transition-colors ${!isLive ? "bg-blue-600 text-white font-bold shadow" : "text-slate-400 hover:text-slate-200"}"
-                      title="11 Realistic Compliance Mock Fixtures">
-                Mock Data
-              </button>
-              <button id="toggle-live-btn" 
-                      class="px-2.5 py-1 rounded transition-colors ${isLive ? "bg-emerald-600 text-white font-bold shadow" : "text-slate-400 hover:text-slate-200"}"
-                      title="Connect directly to P3 FastAPI at localhost:8000/api">
-                Live Backend
-              </button>
+            <!-- Live vs Mock Mode Switcher (Dev only, or Production Live Badge) -->
+            ${
+              apiService.allowMock
+                ? `
+              <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5 text-[11px] font-mono">
+                <button id="toggle-live-btn" 
+                        class="px-2.5 py-1 rounded transition-colors ${isLive ? "bg-emerald-600 text-white font-bold shadow" : "text-slate-400 hover:text-slate-200"}"
+                        title="Connect directly to P3 FastAPI backend">
+                  Real Backend
+                </button>
+                <button id="toggle-mock-btn" 
+                        class="px-2.5 py-1 rounded transition-colors ${!isLive ? "bg-blue-600 text-white font-bold shadow" : "text-slate-400 hover:text-slate-200"}"
+                        title="11 Realistic Compliance Mock Fixtures (Development Only)">
+                  Mock Data
+                </button>
+              </div>
+            `
+                : `
+              <div class="px-2.5 py-1 rounded bg-emerald-950/80 border border-emerald-500 text-emerald-300 text-[11px] font-mono font-bold">
+                PRODUCTION: REAL API
+              </div>
+            `
+            }
+
+            <!-- Backend Connection Status Pill -->
+            <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-slate-800/80 rounded-md border border-slate-700 text-xs text-slate-300 font-mono" title="${apiService.isBackendOnline ? 'Backend Online at ' + apiService.baseUrl : 'Backend Offline'}">
+              <span class="w-2 h-2 rounded-full ${apiService.isBackendOnline ? "bg-emerald-400 animate-pulse" : "bg-rose-500"}"></span>
+              <span>${apiService.isBackendOnline ? "P3 API Online" : "P3 Disconnected"}</span>
             </div>
 
             <!-- Inspector Badge -->
-            <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-slate-800/80 rounded-md border border-slate-700 text-xs text-slate-300 font-mono">
-              <span class="w-2 h-2 rounded-full ${apiService.isBackendOnline ? "bg-emerald-400" : "bg-amber-400"}"></span>
+            <div class="hidden md:flex items-center gap-1.5 px-2.5 py-1 bg-slate-800/80 rounded-md border border-slate-700 text-xs text-slate-400 font-mono">
               <span>insp_delhi_01</span>
             </div>
 

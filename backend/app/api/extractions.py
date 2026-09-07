@@ -9,6 +9,29 @@ from app.models.inspection import ExtractionModel
 router = APIRouter(prefix="/inspections", tags=["Extractions (P1 Contract)"])
 
 @router.post(
+    "/{inspection_id}/extract",
+    status_code=status.HTTP_200_OK,
+    summary="Execute P1 OCR Extraction on Uploaded Images",
+)
+def extract_inspection(
+    inspection_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Executes P1 OCR extraction across all uploaded images for the inspection.
+    Validates declarations against ExtractionPayload and persists result.
+    """
+    extraction_record = inspection_service.extract_inspection_images(db, inspection_id)
+    return {
+        "status": "success",
+        "message": "P1 extraction completed and validated successfully.",
+        "inspection_id": inspection_id,
+        "extraction_id": extraction_record.id,
+        "payload": extraction_record.payload,
+        "created_at": extraction_record.created_at,
+    }
+
+@router.post(
     "/{inspection_id}/extraction",
     status_code=status.HTTP_200_OK,
     summary="Submit P1 Structured Extraction JSON",

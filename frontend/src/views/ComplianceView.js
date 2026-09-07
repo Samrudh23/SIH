@@ -53,13 +53,13 @@ export async function renderComplianceView(inspectionId) {
     }
     return {
       rule_id: rId,
-      status: "COMPLIANT",
-      detected_value: "Statutory declaration compliant",
-      normalized_value: "compliant=true",
-      detection_confidence: 0.95,
+      status: "NOT_DETECTED",
+      detected_value: "Not evaluated by engine",
+      normalized_value: "evaluated=false",
+      detection_confidence: 0.0,
       applicability_confidence: 1.0,
-      reason: "Declaration satisfies statutory parameters.",
-      explanation_for_inspector: "Satisfies statutory requirements.",
+      reason: "Rule evaluation was not emitted by the backend compliance engine.",
+      explanation_for_inspector: "Declaration not identified or evaluated by compliance engine.",
       rule_version: RULE_METADATA[rId],
     };
   });
@@ -94,36 +94,41 @@ export async function renderComplianceView(inspectionId) {
         </div>
 
         <!-- Metric Summary Pills Bar -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-1">
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 pt-1">
           
           <button class="rule-filter-btn active text-left p-2.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors" data-filter="ALL">
             <div class="text-[10px] uppercase font-semibold text-slate-500">Total Evaluated</div>
-            <div class="text-lg font-bold font-mono text-slate-800">${counts.total_rules} Rules</div>
+            <div class="text-base font-bold font-mono text-slate-800">${counts.total_rules} Rules</div>
           </button>
 
           <button class="rule-filter-btn text-left p-2.5 rounded-lg border border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100/60 transition-colors" data-filter="COMPLIANT">
             <div class="text-[10px] uppercase font-semibold text-emerald-700">Compliant</div>
-            <div class="text-lg font-bold font-mono text-emerald-800">${counts.compliant}</div>
+            <div class="text-base font-bold font-mono text-emerald-800">${counts.compliant}</div>
           </button>
 
           <button class="rule-filter-btn text-left p-2.5 rounded-lg border border-rose-200 bg-rose-50/50 hover:bg-rose-100/60 transition-colors" data-filter="POTENTIAL_VIOLATION">
             <div class="text-[10px] uppercase font-semibold text-rose-700">Violations</div>
-            <div class="text-lg font-bold font-mono text-rose-800">${counts.potential_violations}</div>
+            <div class="text-base font-bold font-mono text-rose-800">${counts.potential_violations}</div>
           </button>
 
           <button class="rule-filter-btn text-left p-2.5 rounded-lg border border-amber-200 bg-amber-50/50 hover:bg-amber-100/60 transition-colors" data-filter="NEEDS_MANUAL_REVIEW">
             <div class="text-[10px] uppercase font-semibold text-amber-700">Manual Review</div>
-            <div class="text-lg font-bold font-mono text-amber-800">${counts.needs_manual_review}</div>
+            <div class="text-base font-bold font-mono text-amber-800">${counts.needs_manual_review}</div>
           </button>
 
           <button class="rule-filter-btn text-left p-2.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors" data-filter="NOT_APPLICABLE">
             <div class="text-[10px] uppercase font-semibold text-slate-600">Not Applicable</div>
-            <div class="text-lg font-bold font-mono text-slate-800">${counts.not_applicable}</div>
+            <div class="text-base font-bold font-mono text-slate-800">${counts.not_applicable}</div>
           </button>
 
           <button class="rule-filter-btn text-left p-2.5 rounded-lg border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100/60 transition-colors" data-filter="NOT_DETECTED">
             <div class="text-[10px] uppercase font-semibold text-indigo-700">Not Detected</div>
-            <div class="text-lg font-bold font-mono text-indigo-800">${counts.not_detected}</div>
+            <div class="text-base font-bold font-mono text-indigo-800">${counts.not_detected}</div>
+          </button>
+
+          <button class="rule-filter-btn text-left p-2.5 rounded-lg border border-pink-200 bg-pink-50/50 hover:bg-pink-100/60 transition-colors" data-filter="ANALYSIS_FAILED">
+            <div class="text-[10px] uppercase font-semibold text-pink-700">Analysis Failed</div>
+            <div class="text-base font-bold font-mono text-pink-800">${counts.analysis_failed || 0}</div>
           </button>
 
         </div>
