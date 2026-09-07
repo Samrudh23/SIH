@@ -1,6 +1,6 @@
 /**
  * Main Application Router & Event Controller for SIH26034
- * Single-Page Application client routing and user interaction bindings.
+ * Single-Page Application client routing, accessibility coordination, and user interaction bindings.
  */
 
 import { apiService } from "./services/api.js";
@@ -28,9 +28,20 @@ class App {
 
     // Delegate global event handlers
     document.addEventListener("click", (e) => this.handleGlobalClicks(e));
+    document.addEventListener("keydown", (e) => this.handleGlobalKeydown(e));
 
     // Handle initial route
     await this.handleRoute();
+  }
+
+  announce(message) {
+    const el = document.getElementById("aria-live-announcer");
+    if (el) {
+      el.textContent = "";
+      setTimeout(() => {
+        el.textContent = message;
+      }, 50);
+    }
   }
 
   parseHash() {
@@ -55,6 +66,7 @@ class App {
     }
 
     await this.render();
+    this.announce(`Navigated to ${route} view`);
   }
 
   async render() {
@@ -94,14 +106,14 @@ class App {
         <div class="p-8 bg-rose-50 border border-rose-200 rounded-xl text-center space-y-2">
           <div class="text-rose-800 font-bold text-base">Error Loading View</div>
           <div class="text-xs text-rose-600 font-mono">${err.message}</div>
-          <a href="#/dashboard" class="inline-block mt-3 text-xs font-semibold text-blue-700 underline">&larr; Return to Dashboard</a>
+          <a href="#/dashboard" class="inline-block mt-3 text-xs font-semibold text-blue-700 underline focus:ring-2 focus:ring-blue-500 rounded">&larr; Return to Dashboard</a>
         </div>
       `;
     }
 
     appEl.innerHTML = `
       ${navHtml}
-      <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main id="main-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full" tabindex="-1">
         ${viewHtml}
       </main>
       <div id="modal-container"></div>
@@ -111,13 +123,28 @@ class App {
   }
 
   bindViewEvents() {
-    // 1. Navbar Mode Toggles
+    // 1. Mobile Menu Toggle
+    const mobileMenuBtn = document.getElementById("mobile-menu-btn");
+    const mobileNavDrawer = document.getElementById("mobile-nav-drawer");
+    if (mobileMenuBtn && mobileNavDrawer) {
+      mobileMenuBtn.onclick = () => {
+        const isExpanded = mobileMenuBtn.getAttribute("aria-expanded") === "true";
+        mobileMenuBtn.setAttribute("aria-expanded", String(!isExpanded));
+        if (isExpanded) {
+          mobileNavDrawer.classList.add("hidden");
+        } else {
+          mobileNavDrawer.classList.remove("hidden");
+        }
+      };
+    }
+
+    // 2. Navbar Mode Toggles
     const mockBtn = document.getElementById("toggle-mock-btn");
     const liveBtn = document.getElementById("toggle-live-btn");
     if (mockBtn) mockBtn.onclick = () => apiService.setMode("mock");
     if (liveBtn) liveBtn.onclick = () => apiService.setMode("live");
 
-    // 2. Quick Fixture Dropdown
+    // 3. Quick Fixture Dropdown
     const quickSel = document.getElementById("quick-fixture-select");
     if (quickSel) {
       quickSel.onchange = (e) => {
@@ -128,16 +155,16 @@ class App {
       };
     }
 
-    // 3. New Inspection View Bindings
+    // 4. New Inspection View Bindings
     this.bindNewInspectionEvents();
 
-    // 4. Compliance View Rule Filtering
+    // 5. Compliance View Rule Filtering
     this.bindComplianceFilterEvents();
 
-    // 5. Manual Review View Bindings (Notes form & Medical Gate)
+    // 6. Manual Review View Bindings (Notes form & Medical Gate)
     this.bindManualReviewEvents();
 
-    // 6. History Filter Bindings
+    // 7. History Filter Bindings
     this.bindHistoryFilterEvents();
   }
 
@@ -148,6 +175,12 @@ class App {
 
     if (dropZone && fileInput) {
       dropZone.onclick = () => fileInput.click();
+      dropZone.onkeydown = (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          fileInput.click();
+        }
+      };
       dropZone.ondragover = (e) => {
         e.preventDefault();
         dropZone.classList.add("border-blue-500", "bg-blue-50/50");
@@ -291,18 +324,18 @@ class App {
       .map(
         (item, idx) => `
       <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center gap-3">
-        <img src="${item.preview}" class="w-14 h-14 object-cover rounded border border-slate-300" />
+        <img src="${item.preview}" alt="${item.file.name}" class="w-14 h-14 object-cover rounded border border-slate-300" />
         <div class="flex-1 min-w-0">
           <div class="text-xs font-semibold text-slate-800 truncate">${item.file.name}</div>
           <div class="text-[10px] text-slate-400 font-mono">${(item.file.size / 1024).toFixed(1)} KB</div>
-          <select class="surface-picker text-[11px] mt-1 bg-white border border-slate-300 rounded px-1.5 py-0.5" data-idx="${idx}">
+          <select class="surface-picker text-[11px] mt-1 bg-white border border-slate-300 rounded px-1.5 py-0.5" data-idx="${idx}" aria-label="Select surface for ${item.file.name}">
             <option value="front" ${item.surface === "front" ? "selected" : ""}>Front (PDP)</option>
             <option value="back" ${item.surface === "back" ? "selected" : ""}>Back Panel</option>
             <option value="side" ${item.surface === "side" ? "selected" : ""}>Side Face</option>
             <option value="top" ${item.surface === "top" ? "selected" : ""}>Top / Bottom</option>
           </select>
         </div>
-        <button type="button" class="remove-staged-btn text-slate-400 hover:text-rose-600 p-1" data-idx="${idx}">&times;</button>
+        <button type="button" class="remove-staged-btn text-slate-400 hover:text-rose-600 p-1" data-idx="${idx}" aria-label="Remove ${item.file.name}">&times;</button>
       </div>
     `
       )
@@ -422,6 +455,23 @@ class App {
         appEl.querySelector("main").innerHTML = viewHtml;
         this.bindViewEvents();
       };
+    }
+  }
+
+  handleGlobalKeydown(e) {
+    // ESC key closes any open modal or mobile drawer
+    if (e.key === "Escape") {
+      const modalContainer = document.getElementById("modal-container");
+      if (modalContainer && modalContainer.innerHTML.trim() !== "") {
+        modalContainer.innerHTML = "";
+        return;
+      }
+      const mobileNavDrawer = document.getElementById("mobile-nav-drawer");
+      const mobileMenuBtn = document.getElementById("mobile-menu-btn");
+      if (mobileNavDrawer && !mobileNavDrawer.classList.contains("hidden")) {
+        mobileNavDrawer.classList.add("hidden");
+        if (mobileMenuBtn) mobileMenuBtn.setAttribute("aria-expanded", "false");
+      }
     }
   }
 

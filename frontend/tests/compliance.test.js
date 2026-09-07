@@ -224,4 +224,48 @@ export async function runTests(assert) {
     assert.equal(typeof apiService.updateImageSurface, "function", "apiService.updateImageSurface must be a function");
     assert.equal(typeof apiService.updateCoverage, "function", "apiService.updateCoverage must be a function");
   });
+
+  // Test 14: Workflow stepper distinguishes completed, current, available, and locked stages
+  await assert.test("14. Workflow stepper renders 5 stages and enforces state prerequisites", async () => {
+    const { renderWorkflowStepper } = await import("../src/components/WorkflowStepper.js");
+
+    // Case A: Initial state (new inspection without ID)
+    const initialHtml = renderWorkflowStepper({ currentStage: "evidence" });
+    assert.ok(initialHtml.includes("01"), "Stepper must render Stage 01");
+    assert.ok(initialHtml.includes("Evidence"), "Stage 01 must be Evidence");
+    assert.ok(initialHtml.includes("Extraction"), "Stage 02 must be Extraction");
+    assert.ok(initialHtml.includes("Compliance"), "Stage 03 must be Compliance");
+    assert.ok(initialHtml.includes("Review"), "Stage 04 must be Review");
+    assert.ok(initialHtml.includes("Inspection Report"), "Stage 05 must use 'Inspection Report' terminology");
+    assert.ok(initialHtml.includes('aria-current="step"'), "Must mark current step");
+    assert.ok(initialHtml.includes('aria-disabled="true"'), "Uninitialized future stages must be locked / aria-disabled");
+
+    // Case B: Analyzed inspection with 2 unresolved review items
+    const analyzedHtml = renderWorkflowStepper({
+      inspectionId: "insp-004",
+      currentStage: "compliance",
+      compliance: {
+        overall_status: "NEEDS_MANUAL_REVIEW",
+        summary_counts: { needs_manual_review: 2 },
+      },
+    });
+    assert.ok(analyzedHtml.includes("insp-004"), "Actionable links must target inspection ID");
+    assert.ok(analyzedHtml.includes("open-report-modal-btn"), "Report trigger must be present and actionable");
+    assert.ok(analyzedHtml.includes("2"), "Review stage must render attention badge with count of 2");
+  });
+
+  // Test 15: Responsive Navbar renders accessibility hooks, mobile drawer, and mode switches
+  await assert.test("15. Responsive Navbar renders regulatory brand, mobile drawer, and mode toggles", async () => {
+    const { renderNavbar } = await import("../src/components/Navbar.js");
+    const navHtml = renderNavbar("dashboard");
+
+    assert.ok(navHtml.includes("SIH26034"), "Navbar must contain SIH26034 brand");
+    assert.ok(navHtml.includes("PCR 2011"), "Navbar must contain PCR 2011 badge");
+    assert.ok(navHtml.includes("toggle-live-btn"), "Navbar must include #toggle-live-btn");
+    assert.ok(navHtml.includes("toggle-mock-btn"), "Navbar must include #toggle-mock-btn");
+    assert.ok(navHtml.includes("mobile-menu-btn"), "Navbar must include #mobile-menu-btn");
+    assert.ok(navHtml.includes("mobile-nav-drawer"), "Navbar must include #mobile-nav-drawer");
+    assert.ok(navHtml.includes('aria-label="Toggle navigation menu"'), "Mobile menu button must have accessible label");
+  });
 }
+
