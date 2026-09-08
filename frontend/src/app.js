@@ -508,22 +508,34 @@ class App {
     // 2. Open Report Modal Button
     const reportBtn = e.target.closest("#open-report-modal-btn");
     if (reportBtn) {
+      if (reportBtn.disabled || reportBtn.getAttribute("data-loading") === "true") {
+        return;
+      }
       const id = reportBtn.dataset.id;
       const modalContainer = document.getElementById("modal-container");
       if (modalContainer) {
-        modalContainer.innerHTML = await renderReportModal(id);
-        const closeBtn = document.getElementById("close-report-modal");
-        const backdrop = document.getElementById("report-modal-backdrop");
-        const printBtn = document.getElementById("print-report-btn");
-        const closeModal = () => (modalContainer.innerHTML = "");
-        if (closeBtn) closeBtn.onclick = closeModal;
-        if (backdrop) {
-          backdrop.onclick = (event) => {
-            if (event.target === backdrop) closeModal();
-          };
-        }
-        if (printBtn) {
-          printBtn.onclick = () => window.print();
+        reportBtn.disabled = true;
+        reportBtn.setAttribute("data-loading", "true");
+        reportBtn.classList.add("opacity-75", "cursor-wait");
+        try {
+          modalContainer.innerHTML = await renderReportModal(id);
+          const closeBtn = document.getElementById("close-report-modal");
+          const backdrop = document.getElementById("report-modal-backdrop");
+          const printBtn = document.getElementById("print-report-btn");
+          const closeModal = () => (modalContainer.innerHTML = "");
+          if (closeBtn) closeBtn.onclick = closeModal;
+          if (backdrop) {
+            backdrop.onclick = (event) => {
+              if (event.target === backdrop) closeModal();
+            };
+          }
+          if (printBtn) {
+            printBtn.onclick = () => window.print();
+          }
+        } finally {
+          reportBtn.disabled = false;
+          reportBtn.removeAttribute("data-loading");
+          reportBtn.classList.remove("opacity-75", "cursor-wait");
         }
       }
     }

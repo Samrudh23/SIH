@@ -11,14 +11,12 @@ function escapeHtml(str) {
 }
 
 export async function renderReportModal(inspectionId) {
-  let reportData, compliance, inspection;
+  let reportData;
   try {
     reportData = await apiService.getReportData(inspectionId);
-    compliance = await apiService.getComplianceResult(inspectionId);
-    inspection = await apiService.getInspection(inspectionId);
   } catch (err) {
     return `
-      <div id="report-modal-backdrop" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
+      <div id="report-modal-backdrop" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60">
         <div class="bg-white rounded-xl p-6 max-w-md w-full text-center space-y-3 shadow-xl">
           <div class="text-rose-700 font-bold text-base">Failed to Generate Report</div>
           <p class="text-xs text-slate-600">${escapeHtml(err.message)}</p>
@@ -28,13 +26,16 @@ export async function renderReportModal(inspectionId) {
     `;
   }
 
+  const inspection = reportData.inspection || {};
+  const compliance = reportData.compliance_evaluation || {};
   const counts = compliance.summary_counts || {};
-  const violations = (compliance.rule_results || []).filter((r) => r.status === "POTENTIAL_VIOLATION");
-  const reviewCases = (compliance.rule_results || []).filter((r) => r.status === "NEEDS_MANUAL_REVIEW");
+  const findings = compliance.findings || compliance.rule_results || [];
+  const violations = findings.filter((r) => r.status === "POTENTIAL_VIOLATION");
+  const reviewCases = findings.filter((r) => r.status === "NEEDS_MANUAL_REVIEW");
   const htmlUrl = apiService.getReportHtmlUrl(inspectionId);
 
   return `
-    <div id="report-modal-backdrop" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto print:p-0 print:bg-white">
+    <div id="report-modal-backdrop" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 overflow-y-auto print:p-0 print:bg-white">
       <div class="bg-white rounded-2xl border border-slate-300 shadow-2xl max-w-4xl w-full my-8 overflow-hidden print:border-none print:shadow-none print:my-0">
         
         <!-- Modal Controls (Hidden in Print) -->
