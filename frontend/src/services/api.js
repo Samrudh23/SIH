@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Compliance API Service for SIH26034
  * Connects to P3 FastAPI backend (/api).
  * 
@@ -718,9 +718,9 @@ class ComplianceApiService {
       ],
       mrp: {
         value: 50.0,
-        currency: "â‚¹",
+        currency: "₹",
         tax_inclusivity: true,
-        raw_text: "MRP â‚¹ 50.00 incl. of all taxes",
+        raw_text: "MRP ₹ 50.00 incl. of all taxes",
         confidence: 0.94,
         surface_location: secondarySurface,
         location: secondarySurface,
@@ -729,9 +729,9 @@ class ComplianceApiService {
       mrp_observations: [
         {
           value: 50.0,
-          currency: "â‚¹",
+          currency: "₹",
           tax_inclusivity: true,
-          raw_text: "MRP â‚¹ 50.00 incl. of all taxes",
+          raw_text: "MRP ₹ 50.00 incl. of all taxes",
           confidence: 0.94,
           surface_location: secondarySurface,
           location: secondarySurface,

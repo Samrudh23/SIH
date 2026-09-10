@@ -259,4 +259,194 @@ export async function runBackendIntegrationTests(assert) {
     }
     assert.ok(threw, "Must throw 404 ApiError");
   });
+
+  // Integration Test 10: Golden Case A — Clearly Compliant Product End-to-End
+  await assert.test("Live Backend 10. Golden Case A: Clearly compliant product end-to-end", async () => {
+    const insp = await apiService.createInspection({
+      product_name: "Golden Compliant Marie Biscuits 200g",
+      brand_name: "Britannia Marie",
+      commodity_category: "Biscuits",
+      inspector_id: "insp_golden_a",
+      image_coverage: { front: true, back: true, side: true, top: true },
+    });
+
+    await apiService.submitExtraction(insp.id, {
+      inspection_id: insp.id,
+      product_name: { value: "Marie Biscuits", raw_text: "Golden Compliant Marie Biscuits 200g", confidence: 0.98, location: "front" },
+      commodity_category: { value: "Biscuits", raw_text: "Biscuits", confidence: 0.99, location: "front" },
+      country_of_origin: { value: "India", raw_text: "Country of Origin: India", confidence: 0.99, location: "back" },
+      manufacturer: {
+        premises: "Plot 12, Food Park",
+        city: "Bengaluru",
+        state: "Karnataka",
+        pin_code: "560100",
+        raw_text: "Mfg by: Biscuit Corp, Plot 12, Bengaluru - 560100",
+        confidence: 0.96,
+      },
+      net_quantity: {
+        value: 200.0,
+        unit: "g",
+        raw_text: "Net Weight: 200 g",
+        confidence: 0.97,
+        surface_location: "front",
+        quiet_zone_clear: true,
+      },
+      mrp: {
+        value: 35.0,
+        currency: "₹",
+        tax_inclusivity: true,
+        raw_text: "MRP ₹ 35.00 incl. of all taxes",
+        confidence: 0.96,
+        surface_location: "back",
+        is_sticker: false,
+      },
+      date_of_manufacture: {
+        month: "09",
+        year: "2026",
+        raw_text: "Mfg: 09/2026",
+        confidence: 0.95,
+      },
+      consumer_care: {
+        phone: "1800220000",
+        email: "care@biscuitcorp.in",
+        raw_text: "Care: 1800220000, care@biscuitcorp.in",
+        confidence: 0.95,
+      },
+      image_coverage: { front: true, back: true, side: true, top: true },
+    });
+
+    const result = await apiService.analyzeInspection(insp.id);
+    assert.equal(result.overall_status, "COMPLIANT");
+    assert.equal(result.summary_counts.potential_violations, 0);
+    assert.ok(result.summary_counts.compliant >= 8);
+
+    const report = await apiService.getReportData(insp.id);
+    assert.equal(report.compliance_evaluation.overall_status, "COMPLIANT");
+  });
+
+  // Integration Test 11: Golden Case B — Product with Potential Violations End-to-End
+  await assert.test("Live Backend 11. Golden Case B: Product with statutory violations (prohibited unit & decimal scaling)", async () => {
+    const insp = await apiService.createInspection({
+      product_name: "Violation Test Rice 0.5kg",
+      brand_name: "TestRice",
+      commodity_category: "Rice",
+      inspector_id: "insp_golden_b",
+      image_coverage: { front: true, back: true, side: false, top: false },
+    });
+
+    await apiService.submitExtraction(insp.id, {
+      inspection_id: insp.id,
+      product_name: { value: "Basmati Rice", raw_text: "Violation Test Rice 0.5kg", confidence: 0.95, location: "front" },
+      commodity_category: { value: "Rice", raw_text: "Rice", confidence: 0.95, location: "front" },
+      country_of_origin: { value: "India", raw_text: "Made in India", confidence: 0.95, location: "back" },
+      manufacturer: {
+        premises: "Mill 4",
+        city: "Karnal",
+        state: "Haryana",
+        pin_code: "132001",
+        raw_text: "Packed by: Rice Mills, Karnal - 132001",
+        confidence: 0.92,
+      },
+      // Non-compliant unit "gms" under Rule 13(1) and decimal scaling "0.5 kg" under Rule 13(2)
+      net_quantity: {
+        value: 0.5,
+        unit: "kg",
+        raw_text: "Net Qty: 0.5 kg (500 gms)",
+        confidence: 0.95,
+        surface_location: "front",
+      },
+      mrp: {
+        value: 80.0,
+        currency: "₹",
+        // Lacks tax inclusivity phrase under Rule 2(m)
+        tax_inclusivity: false,
+        raw_text: "MRP ₹ 80.00",
+        confidence: 0.95,
+        surface_location: "back",
+      },
+      date_of_manufacture: { month: "09", year: "2026", raw_text: "09/2026", confidence: 0.9 },
+      consumer_care: { phone: "1800001122", raw_text: "Helpline: 1800001122", confidence: 0.9 },
+      image_coverage: { front: true, back: true, side: false, top: false },
+    });
+
+    const result = await apiService.analyzeInspection(insp.id);
+    assert.equal(result.overall_status, "POTENTIAL_VIOLATION");
+    assert.ok(result.summary_counts.potential_violations >= 1);
+
+    // Rule 2(m) MRP layout violation
+    const mrpRule = result.rule_results.find((r) => r.rule_id === "REQ-MVP-02");
+    assert.equal(mrpRule.status, "POTENTIAL_VIOLATION");
+
+    // Rule 13(2) Unit-switching boundary violation: 0.5 kg must be expressed in grams
+    const scalingRule = result.rule_results.find((r) => r.rule_id === "REQ-MVP-04");
+    assert.equal(scalingRule.status, "POTENTIAL_VIOLATION");
+  });
+
+  // Integration Test 12: Golden Case C — Missing Information on Incomplete Coverage De-escalates to Manual Review
+  await assert.test("Live Backend 12. Golden Case C: Missing information on partial coverage de-escalates to NEEDS_MANUAL_REVIEW", async () => {
+    const insp = await apiService.createInspection({
+      product_name: "Partial Coverage Detergent Bottle",
+      brand_name: "CleanCo",
+      commodity_category: "General Packaged Commodity",
+      inspector_id: "insp_golden_c",
+      image_coverage: { front: true, back: false, side: false, top: false },
+    });
+
+    // Only front declarations present (no date, no manufacturer, no consumer care)
+    await apiService.submitExtraction(insp.id, {
+      inspection_id: insp.id,
+      product_name: { value: "Liquid Detergent", raw_text: "CleanCo Liquid Detergent 1L", confidence: 0.95, location: "front" },
+      commodity_category: { value: "General Packaged Commodity", raw_text: "General Packaged Commodity", confidence: 0.95, location: "front" },
+      net_quantity: { value: 1.0, unit: "L", raw_text: "1 L", confidence: 0.95, surface_location: "front" },
+      image_coverage: { front: true, back: false, side: false, top: false },
+    });
+
+    const result = await apiService.analyzeInspection(insp.id);
+    // Crucial legal principle: Must NOT be POTENTIAL_VIOLATION because package surfaces were incomplete
+    assert.equal(result.overall_status, "NEEDS_MANUAL_REVIEW");
+
+    const req01 = result.rule_results.find((r) => r.rule_id === "REQ-MVP-01");
+    assert.equal(req01.status, "NEEDS_MANUAL_REVIEW");
+    assert.ok(req01.reason.includes("Submitted package surfaces may be incomplete") || req01.reason.includes("incomplete"));
+
+    const req06 = result.rule_results.find((r) => r.rule_id === "REQ-MVP-06");
+    assert.equal(req06.status, "NEEDS_MANUAL_REVIEW");
+  });
+
+  // Integration Test 13: Golden Case D — Multi-Surface Observation Conflict
+  await assert.test("Live Backend 13. Golden Case D: Multi-surface conflict produces NEEDS_MANUAL_REVIEW with conflict provenance", async () => {
+    const insp = await apiService.createInspection({
+      product_name: "Dual Surface Price Discrepancy",
+      brand_name: "SnackCo",
+      commodity_category: "General Packaged Commodity",
+      inspector_id: "insp_golden_d",
+      image_coverage: { front: true, back: true, side: false, top: false },
+    });
+
+    await apiService.submitExtraction(insp.id, {
+      inspection_id: insp.id,
+      product_name: { value: "Potato Chips", raw_text: "Potato Chips", confidence: 0.95, location: "front" },
+      manufacturer: { premises: "Shed 1", city: "Delhi", state: "Delhi", pin_code: "110001", raw_text: "Mfg by SnackCo, Delhi 110001", confidence: 0.9 },
+      net_quantity: { value: 50.0, unit: "g", raw_text: "50 g", confidence: 0.95, surface_location: "front" },
+      date_of_manufacture: { month: "08", year: "2026", raw_text: "08/2026", confidence: 0.9 },
+      consumer_care: { phone: "1800112233", email: "care@snack.in", raw_text: "care@snack.in", confidence: 0.9 },
+      mrp_observations: [
+        { value: 20.0, currency: "₹", tax_inclusivity: true, raw_text: "MRP ₹ 20.00 incl. taxes", confidence: 0.96, surface_location: "front", location: "front" },
+        { value: 25.0, currency: "₹", tax_inclusivity: true, raw_text: "MRP ₹ 25.00 incl. taxes", confidence: 0.95, surface_location: "back", location: "back" },
+      ],
+      image_coverage: { front: true, back: true, side: false, top: false },
+    });
+
+    const result = await apiService.analyzeInspection(insp.id);
+    assert.equal(result.overall_status, "NEEDS_MANUAL_REVIEW");
+
+    const req02 = result.rule_results.find((r) => r.rule_id === "REQ-MVP-02");
+    assert.equal(req02.status, "NEEDS_MANUAL_REVIEW");
+    assert.ok(req02.conflicts, "REQ-MVP-02 must have conflict object attached");
+    assert.equal(req02.conflicts.field, "mrp");
+    assert.equal(req02.conflicts.values_found.length, 2);
+
+    const reviewData = await apiService.getManualReview(insp.id);
+    assert.ok(reviewData.conflicts.length >= 1);
+  });
 }

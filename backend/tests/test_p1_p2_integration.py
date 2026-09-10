@@ -273,3 +273,68 @@ def test_visual_rules_are_never_compliant_or_violation(client):
     assert r15["status"] in ("NEEDS_MANUAL_REVIEW", "NOT_DETECTED")
     assert r14["status"] not in ("COMPLIANT", "POTENTIAL_VIOLATION")
     assert r15["status"] not in ("COMPLIANT", "POTENTIAL_VIOLATION")
+
+def test_golden_case_b_statutory_violations(client):
+    """
+    Golden Case B: Product with statutory violations
+    - Rule 2(m): Lacks mandatory tax inclusivity phrase
+    - Rule 13(1): Uses prohibited unit symbol 'gms'
+    - Rule 13(2): Scaling boundary violation ('0.5 kg' instead of '500 g')
+    """
+    create_res = client.post("/api/inspections", json={
+        "product_name": "Basmati Rice 0.5kg Non-Compliant",
+        "brand_name": "TestGrains",
+        "commodity_category": "Rice",
+        "inspector_id": "insp_golden_b",
+        "image_coverage": {"front": True, "back": True, "side": False, "top": False},
+    })
+    insp_id = create_res.json()["id"]
+
+    extraction_payload = {
+        "inspection_id": insp_id,
+        "product_name": {"value": "Basmati Rice", "raw_text": "Basmati Rice 0.5kg", "confidence": 0.95, "location": "front"},
+        "commodity_category": {"value": "Rice", "raw_text": "Rice", "confidence": 0.95, "location": "front"},
+        "country_of_origin": {"value": "India", "raw_text": "Made in India", "confidence": 0.95, "location": "back"},
+        "manufacturer": {
+            "premises": "Shed 1",
+            "city": "Karnal",
+            "state": "Haryana",
+            "pin_code": "132001",
+            "raw_text": "Packed by: Rice Mills, Karnal - 132001",
+            "confidence": 0.92,
+        },
+        "net_quantity": {
+            "value": 0.5,
+            "unit": "kg",
+            "raw_text": "Net Weight: 0.5 kg (500 gms)",
+            "confidence": 0.95,
+            "surface_location": "front",
+        },
+        "mrp": {
+            "value": 75.0,
+            "currency": "₹",
+            "tax_inclusivity": False,
+            "raw_text": "MRP ₹ 75.00",
+            "confidence": 0.95,
+            "surface_location": "back",
+        },
+        "date_of_manufacture": {"month": "09", "year": "2026", "raw_text": "09/2026", "confidence": 0.9},
+        "consumer_care": {"phone": "1800119988", "email": "care@grains.in", "raw_text": "care@grains.in", "confidence": 0.9},
+        "image_coverage": {"front": True, "back": True, "side": False, "top": False},
+    }
+    sub_res = client.post(f"/api/inspections/{insp_id}/extraction", json=extraction_payload)
+    assert sub_res.status_code == 200
+
+    comp_res = client.post(f"/api/inspections/{insp_id}/analyze")
+    assert comp_res.status_code == 200
+    comp_data = comp_res.json()
+
+    assert comp_data["overall_status"] == "POTENTIAL_VIOLATION"
+    assert comp_data["summary_counts"]["potential_violations"] >= 2
+
+    rules_map = {r["rule_id"]: r for r in comp_data["rule_results"]}
+    # REQ-MVP-02: Missing tax inclusivity phrase
+    assert rules_map["REQ-MVP-02"]["status"] == "POTENTIAL_VIOLATION"
+    # REQ-MVP-04: Unit-switching boundary violation (0.5 kg instead of grams)
+    assert rules_map["REQ-MVP-04"]["status"] == "POTENTIAL_VIOLATION"
+
