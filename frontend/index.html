@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SIH26034 — Legal Metrology Compliance Scanner</title>
+  
+  <!-- Tailwind CSS CDN for utility classes -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              800: '#1e40af',
+              900: '#1e3a8a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Local Design System Tokens & Typography -->
+  <link rel="stylesheet" href="./src/styles/app.css" />
+</head>
+<body class="h-full flex flex-col antialiased text-slate-900 bg-slate-50 selection:bg-blue-600 selection:text-white">
+  
+  <!-- Accessible Skip Link for Keyboard Users -->
+  <a href="#main-content" class="skip-link">Skip to main inspection content</a>
+
+  <!-- ARIA Live Region for Screen Reader Announcements -->
+  <div id="aria-live-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Root App Container -->
+  <div id="app" class="min-h-full flex flex-col">
+    <!-- Initial Loading State (Replaced on DOMContentLoaded) -->
+    <div class="flex-1 flex flex-col items-center justify-center p-8 space-y-4">
+      <div class="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      <div class="text-xs font-mono text-slate-500 uppercase tracking-wider">Initializing Legal Metrology Screening Engine...</div>
+    </div>
+  </div>
+
+  <!-- Main ES Module Application Script -->
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>

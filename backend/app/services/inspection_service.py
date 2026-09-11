@@ -34,6 +34,7 @@ class InspectionService:
             metadata_json=data.metadata or {},
             status=WorkflowStatus.CREATED.value,
             compliance_status="PENDING",
+            is_medical_device_confirmed=None,
         )
         db.add(inspection)
         db.commit()
@@ -103,6 +104,14 @@ class InspectionService:
         )
         db.add(evidence)
 
+        # Auto-update coverage checklist based on normalized surface
+        from app.services.p1_extractor import normalize_surface
+        norm_surface = normalize_surface(image_type)
+        cov = dict(inspection.image_coverage or {"front": False, "back": False, "side": False, "top": False})
+        if norm_surface in ("front", "back", "side", "top"):
+            cov[norm_surface] = True
+            inspection.image_coverage = cov
+
         # Update inspection state
         if inspection.status == WorkflowStatus.CREATED.value:
             inspection.status = WorkflowStatus.IMAGE_UPLOADED.value
@@ -111,6 +120,49 @@ class InspectionService:
         db.commit()
         db.refresh(evidence)
         return evidence
+
+    def update_image_surface(
+        self,
+        db: Session,
+        inspection_id: str,
+        evidence_id: str,
+        surface: str,
+    ) -> ImageEvidenceModel:
+        inspection = self.get_inspection(db, inspection_id)
+        evidence = db.query(ImageEvidenceModel).filter(
+            ImageEvidenceModel.id == evidence_id,
+            ImageEvidenceModel.inspection_id == inspection_id,
+        ).first()
+        if not evidence:
+            raise HTTPException(status_code=404, detail=f"Evidence image '{evidence_id}' not found.")
+
+        from app.services.p1_extractor import normalize_surface
+        norm_surface = normalize_surface(surface)
+        evidence.image_type = norm_surface
+
+        # Refresh coverage checklist
+        cov = dict(inspection.image_coverage or {"front": False, "back": False, "side": False, "top": False})
+        if norm_surface in ("front", "back", "side", "top"):
+            cov[norm_surface] = True
+        inspection.image_coverage = cov
+        inspection.updated_at = datetime.now(timezone.utc)
+
+        db.commit()
+        db.refresh(evidence)
+        return evidence
+
+    def update_image_coverage(
+        self,
+        db: Session,
+        inspection_id: str,
+        coverage: ImageCoverage,
+    ) -> InspectionModel:
+        inspection = self.get_inspection(db, inspection_id)
+        inspection.image_coverage = coverage.model_dump()
+        inspection.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(inspection)
+        return inspection
 
     def save_extraction(
         self,
@@ -153,6 +205,23 @@ class InspectionService:
         db.refresh(extraction_record)
         return extraction_record
 
+    def extract_inspection_images(
+        self,
+        db: Session,
+        inspection_id: str,
+    ) -> ExtractionModel:
+        inspection = self.get_inspection(db, inspection_id)
+        images = inspection.images or []
+        if not images:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot extract inspection '{inspection_id}': no images have been uploaded yet."
+            )
+        from app.services.p1_extractor import p1_extractor
+        coverage = ImageCoverage(**(inspection.image_coverage or {}))
+        payload = p1_extractor.extract_from_inspection_images(images, explicit_coverage=coverage)
+        return self.save_extraction(db, inspection_id, payload)
+
     def run_compliance_analysis(
         self,
         db: Session,
@@ -161,14 +230,25 @@ class InspectionService:
     ) -> ComplianceResultModel:
         inspection = self.get_inspection(db, inspection_id)
         extraction_model = db.query(ExtractionModel).filter(ExtractionModel.inspection_id == inspection_id).first()
+
+        # If extraction not yet submitted but images exist, auto-run P1 extraction
         if not extraction_model:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Cannot analyze inspection '{inspection_id}': no extraction data has been submitted yet."
-            )
+            if inspection.images:
+                extraction_model = self.extract_inspection_images(db, inspection_id)
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot analyze inspection '{inspection_id}': no extraction data has been submitted yet."
+                )
 
         extraction_payload = ExtractionPayload.model_validate(extraction_model.payload)
         coverage = ImageCoverage(**inspection.image_coverage)
+
+        # Persist medical device confirmation if explicitly supplied; otherwise use persisted decision
+        if is_medical_device_confirmed is not None:
+            inspection.is_medical_device_confirmed = is_medical_device_confirmed
+        else:
+            is_medical_device_confirmed = inspection.is_medical_device_confirmed
 
         # Invoke swappable compliance engine
         engine = get_compliance_engine()
@@ -273,6 +353,7 @@ class InspectionService:
             inspector_id=record.inspector_id,
             image_coverage=ImageCoverage(**coverage_data),
             notes=record.notes,
+            is_medical_device_confirmed=record.is_medical_device_confirmed,
             images_count=images_count,
             has_extraction=has_extraction,
             has_result=has_result,

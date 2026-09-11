@@ -12,6 +12,8 @@ from app.schemas.inspection import (
 )
 from app.schemas.compliance import ComplianceResult
 from app.services.inspection_service import inspection_service
+from app.services.report_service import report_service
+from fastapi.responses import HTMLResponse
 
 router = APIRouter(prefix="/inspections", tags=["Inspections"])
 
@@ -88,3 +90,24 @@ def confirm_medical_device_gate(
         evaluated_at=result_record.evaluated_at,
         engine_version=result_record.engine_version,
     )
+
+@router.get("/{inspection_id}/report", summary="Retrieve Inspection Report (JSON)")
+def get_inspection_report_json(
+    inspection_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Convenience alias on /api/inspections/{id}/report for retrieving structured JSON report.
+    """
+    return report_service.generate_report_data(db, inspection_id)
+
+@router.get("/{inspection_id}/report/html", response_class=HTMLResponse, summary="Retrieve Printable HTML Report")
+def get_inspection_report_html(
+    inspection_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Convenience alias on /api/inspections/{id}/report/html for printable HTML report.
+    """
+    return report_service.generate_html_report(db, inspection_id)
+

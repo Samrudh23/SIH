@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SIH26034 — Frontend Compliance Test Runner</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 p-8 font-mono text-xs">
+  <div class="max-w-3xl mx-auto space-y-6">
+    <div class="border-b border-slate-700 pb-4 flex items-center justify-between">
+      <div>
+        <h1 class="text-base font-bold text-white tracking-wide">SIH26034 Compliance Test Suite</h1>
+        <p class="text-slate-400 text-xs">P4 Frontend Verification & Regulatory Integrity Checks</p>
+      </div>
+      <div id="test-status" class="px-3 py-1 rounded bg-slate-800 text-amber-400 font-bold border border-slate-700">
+        Running...
+      </div>
+    </div>
+
+    <div id="test-output" class="bg-slate-950 border border-slate-800 rounded-xl p-6 space-y-2 font-mono leading-relaxed">
+      <!-- Test log items -->
+    </div>
+
+    <div id="test-summary" class="p-4 rounded-xl font-bold"></div>
+  </div>
+
+  <script type="module">
+    import { executeTestSuite } from "./runner.js";
+
+    const outputEl = document.getElementById("test-output");
+    const summaryEl = document.getElementById("test-summary");
+    const statusEl = document.getElementById("test-status");
+
+    // Intercept console.log
+    const oldLog = console.log;
+    const oldError = console.error;
+
+    function append(text, color) {
+      const line = document.createElement("div");
+      line.style.color = color;
+      line.innerText = text;
+      outputEl.appendChild(line);
+    }
+
+    console.log = function(...args) {
+      const str = args.join(" ").replace(/\x1b\[[0-9;]*m/g, "");
+      append(str, str.includes("PASS") ? "#34d399" : "#e2e8f0");
+      oldLog.apply(console, args);
+    };
+
+    console.error = function(...args) {
+      const str = args.join(" ").replace(/\x1b\[[0-9;]*m/g, "");
+      append(str, "#f87171");
+      oldError.apply(console, args);
+    };
+
+    executeTestSuite().then(res => {
+      if (res.success) {
+        statusEl.className = "px-3 py-1 rounded bg-emerald-900/60 text-emerald-300 font-bold border border-emerald-700";
+        statusEl.innerText = "ALL TESTS PASSED";
+        summaryEl.className = "bg-emerald-950 border border-emerald-800 text-emerald-300 p-4 rounded-xl";
+        summaryEl.innerText = `✓ 100% SUCCESS: ${res.passed}/${res.total} tests passed cleanly.`;
+      } else {
+        statusEl.className = "px-3 py-1 rounded bg-rose-900/60 text-rose-300 font-bold border border-rose-700";
+        statusEl.innerText = "TESTS FAILED";
+        summaryEl.className = "bg-rose-950 border border-rose-800 text-rose-300 p-4 rounded-xl";
+        summaryEl.innerText = `✗ FAILURE: ${res.failed} tests failed.`;
+      }
+    });
+  </script>
+</body>
+</html>

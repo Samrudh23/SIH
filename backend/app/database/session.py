@@ -32,4 +32,11 @@ def init_db():
         ComplianceResultModel,
         ReportModel,
     )
+    from sqlalchemy import text
     Base.metadata.create_all(bind=engine)
+    # Lightweight migration for existing SQLite database files
+    with engine.begin() as conn:
+        try:
+            conn.execute(text("ALTER TABLE inspections ADD COLUMN is_medical_device_confirmed BOOLEAN"))
+        except Exception:
+            pass

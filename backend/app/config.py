@@ -25,6 +25,7 @@ class Settings:
         self.MAX_FILE_SIZE_BYTES: int = int(os.getenv("MAX_FILE_SIZE_BYTES", str(10 * 1024 * 1024))) # 10MB
         self.ALLOWED_IMAGE_EXTENSIONS: set = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 
+<<<<<<< HEAD
         # CORS
         self.ALLOWED_ORIGINS: List[str] = [
             origin.strip()
@@ -37,6 +38,10 @@ class Settings:
 
         # Compliance Engine: "mock" or "real" (Defaults to "real" for live API mode)
         self.COMPLIANCE_ENGINE_TYPE: str = os.getenv("COMPLIANCE_ENGINE_TYPE", "real")
+=======
+    # Compliance Engine: "mock" or "real"
+    COMPLIANCE_ENGINE_TYPE: str = os.getenv("COMPLIANCE_ENGINE_TYPE", "real")
+>>>>>>> bcdaad870c13be1cf5ca4bff9da3e5035cf4c9ed
 
 settings = Settings()
 settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

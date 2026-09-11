@@ -31,6 +31,12 @@ class ImageUploadResponse(BaseModel):
     image_type: str = Field(..., description="Surface label e.g. front, back, side")
     uploaded_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+class ImageSurfaceUpdate(BaseModel):
+    surface: str = Field(..., description="Package surface: front, back, side, top, pdp")
+
+class CoverageUpdate(BaseModel):
+    coverage: ImageCoverage = Field(..., description="Updated package surface checklist")
+
 class InspectionResponse(BaseModel):
     id: str
     created_at: datetime
@@ -43,6 +49,10 @@ class InspectionResponse(BaseModel):
     inspector_id: str
     image_coverage: ImageCoverage
     notes: Optional[str] = None
+    is_medical_device_confirmed: Optional[bool] = Field(
+        default=None,
+        description="Inspector confirmation: None (pending), True (confirmed medical device), False (rejected)",
+    )
     images_count: int = 0
     has_extraction: bool = False
     has_result: bool = False
