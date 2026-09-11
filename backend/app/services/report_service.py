@@ -73,6 +73,7 @@ class ReportService:
         return report_data
 
     def generate_html_report(self, db: Session, inspection_id: str) -> str:
+        import html
         data = self.generate_report_data(db, inspection_id)
         insp = data["inspection"]
         comp = data["compliance_evaluation"]
@@ -97,17 +98,23 @@ class ReportService:
                 "NOT_DETECTED": "#9333ea",
             }.get(f.get("status"), "#6b7280")
 
+            rule_id_esc = html.escape(str(f.get('rule_id') or ''))
+            status_esc = html.escape(str(f.get('status') or ''))
+            detected_val_esc = html.escape(str(f.get('detected_value') or '—'))
+            explanation_esc = html.escape(str(f.get('explanation_for_inspector') or ''))
+            clause_esc = html.escape(str(f.get('rule_version', {}).get('clause', 'N/A')))
+
             findings_rows += f"""
             <tr>
-                <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">{f.get('rule_id')}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">{rule_id_esc}</td>
                 <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">
                     <span style="background-color: {badge_color}; color: white; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">
-                        {f.get('status')}
+                        {status_esc}
                     </span>
                 </td>
-                <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">{f.get('detected_value') or '—'}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-size: 12px; color: #4b5563;">{f.get('explanation_for_inspector')}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-size: 11px; color: #6b7280;">{f.get('rule_version', {}).get('clause', 'N/A')}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">{detected_val_esc}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-size: 12px; color: #4b5563;">{explanation_esc}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-size: 11px; color: #6b7280;">{clause_esc}</td>
             </tr>
             """
 
@@ -115,7 +122,8 @@ class ReportService:
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Compliance Report — {insp['id']}</title>
+    <title>Compliance Report — {html.escape(str(insp['id']))}</title>
+
     <style>
         body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 40px; color: #1f2937; line-height: 1.5; }}
         .header {{ border-bottom: 3px solid #1e3a8a; padding-bottom: 15px; margin-bottom: 25px; }}
@@ -144,18 +152,18 @@ class ReportService:
     <div class="grid">
         <div class="card">
             <h3>Inspection Overview</h3>
-            <div><strong>Inspection ID:</strong> {insp['id']}</div>
-            <div><strong>Date Generated:</strong> {data['generated_at']}</div>
-            <div><strong>Inspector:</strong> {insp['inspector_id']}</div>
-            <div><strong>Product Name:</strong> {insp['product_name']}</div>
-            <div><strong>Brand:</strong> {insp['brand_name']}</div>
-            <div><strong>Commodity Category:</strong> {insp['commodity_category']}</div>
-            <div><strong>Notes:</strong> {insp['notes']}</div>
+            <div><strong>Inspection ID:</strong> {html.escape(str(insp['id']))}</div>
+            <div><strong>Date Generated:</strong> {html.escape(str(data['generated_at']))}</div>
+            <div><strong>Inspector:</strong> {html.escape(str(insp['inspector_id']))}</div>
+            <div><strong>Product Name:</strong> {html.escape(str(insp['product_name']))}</div>
+            <div><strong>Brand:</strong> {html.escape(str(insp['brand_name']))}</div>
+            <div><strong>Commodity Category:</strong> {html.escape(str(insp['commodity_category']))}</div>
+            <div><strong>Notes:</strong> {html.escape(str(insp['notes']))}</div>
         </div>
         <div class="card">
             <h3>Automated Screening Summary</h3>
             <div>Overall Result:</div>
-            <div class="status-badge">{insp['overall_compliance_status']}</div>
+            <div class="status-badge">{html.escape(str(insp['overall_compliance_status']))}</div>
             <div style="margin-top: 15px;"><strong>Total Rules Checked:</strong> {comp.get('summary_counts', {}).get('total_rules', 15)}</div>
             <div><strong>Compliant Rules:</strong> {comp.get('summary_counts', {}).get('compliant', 0)}</div>
             <div><strong>Potential Violations:</strong> {comp.get('summary_counts', {}).get('potential_violations', 0)}</div>

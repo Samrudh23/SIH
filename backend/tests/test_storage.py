@@ -44,3 +44,19 @@ def test_path_traversal_prevention(client, temp_upload_dir):
     res = client.get("/api/images/..%2f..%2fsecret.txt")
     # Must be 400 or 404, never 200 or allow escaping upload directory
     assert res.status_code in (400, 404)
+
+def test_upload_suspicious_filenames(client, temp_upload_dir):
+    create_res = client.post("/api/inspections", json={"product_name": "Security Test Item"})
+    insp_id = create_res.json()["id"]
+
+    # 1. Suspicious filename with script tags and path traversal attempt
+    fake_jpg = io.BytesIO(b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01")
+    files = {"file": ("../../test<script>alert(1)</script>.jpg", fake_jpg, "image/jpeg")}
+    res = client.post(f"/api/inspections/{insp_id}/image", files=files)
+    assert res.status_code == 201
+    safe_name = res.json()["file_name"]
+    # Verify the saved filename is sanitized (uses UUID suffix and does not contain path traversal or script tags)
+    assert ".." not in safe_name
+    assert "<script>" not in safe_name
+    assert safe_name.endswith(".jpg")
+
