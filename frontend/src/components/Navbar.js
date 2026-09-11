@@ -44,21 +44,22 @@ export function renderNavbar(activeRoute = "dashboard") {
         <div class="flex items-center justify-between h-16">
           
           <!-- System Branding & Identifier -->
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
             <a href="#/dashboard" 
-               class="flex items-center gap-3 text-white hover:text-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg p-1"
+               class="flex items-center gap-2.5 text-white hover:text-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg p-1 min-w-0"
                aria-label="SIH26034 Legal Metrology Compliance Scanner Dashboard">
-              <div class="w-9 h-9 rounded-lg bg-blue-700 border border-blue-500 flex items-center justify-center font-bold text-white shadow-sm flex-shrink-0" aria-hidden="true">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-blue-700 border border-blue-500 flex items-center justify-center font-bold text-white shadow-sm flex-shrink-0" aria-hidden="true">
+                <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
                 </svg>
               </div>
-              <div>
-                <div class="flex items-center gap-2">
+              <div class="min-w-0">
+                <div class="flex items-center gap-1.5 sm:gap-2">
                   <span class="font-bold text-sm tracking-tight">SIH26034</span>
-                  <span class="text-[10px] uppercase font-mono px-1.5 py-0.2 bg-slate-800 text-blue-300 border border-slate-700 rounded font-semibold">PCR 2011</span>
+                  <span class="text-[9px] sm:text-[10px] uppercase font-mono px-1.5 py-0.2 bg-slate-800 text-blue-300 border border-slate-700 rounded font-semibold flex-shrink-0">PCR 2011</span>
                 </div>
-                <div class="text-[11px] text-slate-400 truncate">Legal Metrology Compliance Scanner</div>
+                <div class="text-[11px] text-slate-400 truncate hidden sm:block">Legal Metrology Compliance Scanner</div>
+                <div class="text-[10px] text-slate-400 truncate sm:hidden">Compliance Scanner</div>
               </div>
             </a>
           </div>
@@ -84,28 +85,32 @@ export function renderNavbar(activeRoute = "dashboard") {
           </nav>
 
           <!-- System Status & Controls -->
-          <div class="flex items-center gap-2.5">
+          <div class="flex items-center gap-2 flex-shrink-0">
             
             <!-- Live vs Mock Mode Switcher -->
             ${
               apiService.allowMock
                 ? `
-              <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5 text-[11px] font-mono">
+              <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5 text-[10px] sm:text-[11px] font-mono">
                 <button id="toggle-live-btn" 
-                        class="px-2.5 py-1 rounded transition-colors focus:outline-none focus:ring-1 focus:ring-blue-400 ${isLive ? "bg-emerald-600 text-white font-bold shadow" : "text-slate-400 hover:text-slate-200"}"
+                        class="px-2 sm:px-2.5 py-1 rounded transition-colors focus:outline-none focus:ring-1 focus:ring-blue-400 ${isLive ? "bg-emerald-600 text-white font-bold shadow" : "text-slate-400 hover:text-slate-200"}"
                         title="Connect directly to P3 FastAPI backend">
-                  Real Backend
+                  <span class="hidden sm:inline">Real Backend</span>
+                  <span class="sm:hidden">Real</span>
                 </button>
                 <button id="toggle-mock-btn" 
-                        class="px-2.5 py-1 rounded transition-colors focus:outline-none focus:ring-1 focus:ring-blue-400 ${!isLive ? "bg-blue-600 text-white font-bold shadow" : "text-slate-400 hover:text-slate-200"}"
+                        class="px-2 sm:px-2.5 py-1 rounded transition-colors focus:outline-none focus:ring-1 focus:ring-blue-400 ${!isLive ? "bg-blue-600 text-white font-bold shadow" : "text-slate-400 hover:text-slate-200"}"
                         title="11 Realistic Compliance Mock Fixtures (Development Only)">
-                  Mock Data
+                  <span class="hidden sm:inline">Mock Data</span>
+                  <span class="sm:hidden">Mock</span>
                 </button>
               </div>
             `
                 : `
-              <div class="px-2.5 py-1 rounded bg-emerald-950/80 border border-emerald-500 text-emerald-300 text-[11px] font-mono font-bold">
-                PRODUCTION: REAL API
+              <div class="px-2 sm:px-2.5 py-1 rounded bg-emerald-950/80 border border-emerald-500 text-emerald-300 text-[10px] sm:text-[11px] font-mono font-bold flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse sm:hidden"></span>
+                <span class="hidden sm:inline">PRODUCTION: REAL API</span>
+                <span class="sm:hidden">REAL API</span>
               </div>
             `
             }
@@ -126,7 +131,7 @@ export function renderNavbar(activeRoute = "dashboard") {
             <!-- Mobile Navigation Menu Toggle -->
             <button type="button" 
                     id="mobile-menu-btn" 
-                    class="md:hidden p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="md:hidden flex items-center justify-center p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 flex-shrink-0"
                     aria-expanded="false" 
                     aria-controls="mobile-nav-drawer"
                     aria-label="Toggle navigation menu">
