@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: sih26034-compliance-scanner
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT --workers 2
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: false
+      - key: PYTHONPATH
+        value: backend
+      - key: DATABASE_URL
+        value: sqlite:////var/data/sih26034.db
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+      - key: SERVE_FRONTEND
+        value: true
+      - key: FRONTEND_DIR
+        value: frontend
+      - key: COMPLIANCE_ENGINE_TYPE
+        value: real
+    disk:
+      name: sih-data
+      mountPath: /var/data
+      sizeGB: 1

@@ -1,4 +1,4 @@
-﻿# Python
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
@@ -47,6 +47,9 @@ Thumbs.db
 .env
 .env.*
 *.env
+!.env.example
+!*.env.example
+!**/.env.example
 secrets.yaml
 secrets.json
 
