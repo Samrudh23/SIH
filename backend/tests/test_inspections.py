@@ -66,3 +66,49 @@ def test_list_inspections_with_filters(client):
     assert res_filtered.status_code == 200
     assert res_filtered.json()["total"] == 1
     assert res_filtered.json()["items"][0]["product_name"] == "Amul Milk"
+
+def test_report_html_xss_sanitization(client):
+    # Create inspection with XSS payload in product_name
+    payload = {
+        "product_name": "<script>alert('xss')</script>",
+    }
+    create_res = client.post("/api/inspections", json=payload)
+    insp_id = create_res.json()["id"]
+
+    # Set notes with HTML injection
+    client.post(f"/api/inspections/{insp_id}/notes", json={"notes": "<img src=x onerror=alert(1)>"})
+
+    # Submit extraction & analyze
+    client.post(f"/api/inspections/{insp_id}/extraction", json={
+        "product_name": {"value": "<script>alert('xss')</script>", "raw_text": "text", "confidence": 0.9}
+    })
+    client.post(f"/api/inspections/{insp_id}/analyze")
+
+    # Get HTML report
+    html_res = client.get(f"/api/reports/{insp_id}/html")
+    assert html_res.status_code == 200
+    html_body = html_res.text
+    # Verify raw script/img tags are escaped and not rendered unescaped
+    assert "<script>" not in html_body
+    assert "<img src=x" not in html_body
+    assert "&lt;script&gt;" in html_body
+    assert "&lt;img src=x" in html_body
+
+
+
+def test_invalid_inputs_and_error_handling(client):
+    # Nonexistent endpoint
+    res_404 = client.get("/api/nonexistent-route")
+    assert res_404.status_code == 404
+
+    # Nonexistent inspection ID for report
+    res_rep = client.get("/api/reports/nonexistent-id-12345")
+    assert res_rep.status_code == 404
+
+    # Analysis before extraction
+    create_res = client.post("/api/inspections", json={"product_name": "No Extraction Item"})
+    insp_id = create_res.json()["id"]
+    res_no_ext = client.post(f"/api/inspections/{insp_id}/analyze")
+    assert res_no_ext.status_code == 400
+    assert "no extraction data" in res_no_ext.json()["detail"]
+
