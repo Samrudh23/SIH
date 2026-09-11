@@ -1,0 +1,36 @@
+services:
+  sih26034-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sih26034-compliance-scanner
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      - APP_ENV=production
+      - DEBUG=false
+      - PORT=8000
+      - HOST=0.0.0.0
+      - DATABASE_URL=sqlite:////data/db/sih26034.db
+      - UPLOAD_DIR=/data/uploads
+      - SERVE_FRONTEND=true
+      - FRONTEND_DIR=/app/frontend
+      - ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,http://127.0.0.1:8000
+      - COMPLIANCE_ENGINE_TYPE=real
+    volumes:
+      # Persistent host-mounted storage: data persists across rebuilds & restarts
+      - sih_db_data:/data/db
+      - sih_upload_data:/data/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  sih_db_data:
+    driver: local
+  sih_upload_data:
+    driver: local

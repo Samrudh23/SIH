@@ -37,9 +37,15 @@ function resolveApiBaseUrl(env) {
     if (localOverride) {
       return localOverride.replace(/\/+$/, "");
     }
+
+    // 3. Unified full-stack deployment check:
+    // If loaded on the unified backend server (port 8000 or any non-dev port/domain), use same-origin /api
+    if (window.location.port !== "3000" && window.location.port !== "5173") {
+      return "/api";
+    }
   }
 
-  // 3. Environment-based defaults
+  // 4. Environment-based defaults
   switch (env) {
     case "production":
       // In production, use same-origin /api (standard reverse-proxy pattern)
