@@ -331,8 +331,8 @@ Specific technologies will be finalized during the architecture phase.
 |**P2**|Compliance|Legal rules, rule mapping and compliance engine|
 |**P3**|Backend|APIs, database, authentication and system integration|
 |**P4**|Frontend / UX|Inspector-facing interface and user experience|
-|**P5**|Dashboard / Reports|Admin dashboard, analytics and report generation|
-|**P6**|QA / Data / Integration|Dataset, testing, evaluation and integration support|
+|**P5**|Security Testing|Vulnerability testing, auth/access-control checks|
+|**P6**|Deployment and Polish|CI/CD, hosting/infra setup, final QA pass, UI/UX polish|
 
 Responsibilities may evolve as the project develops.
 
